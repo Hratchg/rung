@@ -8,7 +8,7 @@ const APPROVE_LABEL: Record<Step, string> = {
   WATCH: 'Approve',
   ASK: 'Run ask',
   SLOW: 'Approve',
-  HOLD: 'Approve hold',
+  HOLD: 'Approve',
   HAND: 'Decide',
 }
 
@@ -67,7 +67,16 @@ export default function Queue({ carriers }: { carriers: string[] }) {
 
       {rows && rows.length > 0 && (
         <div className="overflow-x-auto rounded-lg border border-slate-300 bg-white">
-          <table className="w-full min-w-[1180px] border-collapse text-left text-base">
+          <table className="w-full min-w-[1200px] table-fixed border-collapse text-left text-base">
+            <colgroup>
+              <col className="w-[150px]" />
+              <col className="w-[112px]" />
+              <col className="w-[156px]" />
+              <col />
+              <col className="w-[220px]" />
+              <col className="w-[128px]" />
+              <col className="w-[128px]" />
+            </colgroup>
             <thead className="bg-slate-800 text-white">
               <tr>
                 <th className="px-3 py-2 font-semibold">Box</th>
@@ -139,7 +148,7 @@ function Row({ row, onOverride }: { row: QueueRow; onOverride: () => void }) {
           {row.owner && <span className="text-slate-700">Owner: {row.owner}</span>}
         </div>
       </td>
-      <td className="max-w-[420px] px-3 py-2">
+      <td className="px-3 py-2">
         <button type="button" onClick={() => setOpen(!open)} className={`text-left ${open ? '' : 'line-clamp-3'}`} title={open ? 'Show less' : row.reason}>
           {row.reason}
         </button>
@@ -159,7 +168,7 @@ function Row({ row, onOverride }: { row: QueueRow; onOverride: () => void }) {
         <SourceBadges badges={row.badges} />
       </td>
       <td className="px-3 py-2">
-        <div className="flex w-32 flex-col gap-1.5">
+        <div className="flex flex-col gap-1.5">
           {approved && <span className="font-semibold text-emerald-800">Approved</span>}
           {overridden && <span className="font-semibold text-violet-800">Planner set {row.planner!.step}</span>}
           {!approved && row.step !== 'HAND' && (
@@ -220,7 +229,7 @@ function OverrideDialog({ row, onClose }: { row: QueueRow; onClose: () => void }
               className={`rounded-lg border-2 px-3 py-2 text-left ${step === s ? 'border-slate-900 bg-slate-100' : 'border-slate-200 hover:border-slate-400'}`}
             >
               <StepChip step={s} />
-              {s === row.engine_step && <span className="ml-2 text-slate-600">Rung</span>}
+              {s === row.engine_step && <span className="ml-2 text-slate-600">Recommended</span>}
             </button>
           ))}
         </div>

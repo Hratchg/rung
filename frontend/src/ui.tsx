@@ -37,7 +37,7 @@ const SHORT: Record<SourceName, string> = {
 export function BadgeChip({ kind, children }: { kind: 'live' | 'simulated'; children?: ReactNode }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded border px-1.5 text-base ${
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded border px-1.5 text-base ${
         kind === 'live' ? 'border-emerald-700 bg-emerald-50 text-emerald-900' : 'border-dashed border-slate-400 bg-white text-slate-700'
       }`}
     >
@@ -55,14 +55,16 @@ export function SourceBadges({ badges }: { badges: Record<SourceName, Badge> }) 
   return (
     <div className="flex flex-col items-start gap-1">
       {live.length > 0 && (
-        <BadgeChip kind="live">
-          <span className="text-emerald-800">{live.map((s) => SHORT[s]).join(' ')}</span>
-        </BadgeChip>
+        <>
+          <BadgeChip kind="live" />
+          <span className="text-emerald-900">{live.map((s) => SHORT[s]).join(', ')}</span>
+        </>
       )}
       {sim.length > 0 && (
-        <BadgeChip kind="simulated">
-          <span className="text-slate-600">{sim.length === present.length ? `all ${sim.length}` : sim.map((s) => SHORT[s]).join(' ')}</span>
-        </BadgeChip>
+        <>
+          <BadgeChip kind="simulated" />
+          <span className="text-slate-600">{sim.length === present.length ? `All ${sim.length} sources` : sim.map((s) => SHORT[s]).join(', ')}</span>
+        </>
       )}
     </div>
   )

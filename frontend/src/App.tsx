@@ -20,12 +20,10 @@ function payload(event: ScenarioEvent): ScenarioEvent {
 
 function Counter({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
-    <div className="min-w-[8.5rem] rounded-lg border border-current/20 bg-white/5 px-3 py-1">
-      <div className="text-base opacity-80">{label}</div>
-      <div className="text-xl font-bold tabular-nums">
-        {value}
-        {detail && <span className="ml-2 text-base font-normal opacity-80">{detail}</span>}
-      </div>
+    <div className="flex items-baseline gap-2 rounded-lg border border-current/20 bg-white/5 px-3 py-1">
+      <span className="text-base opacity-80">{label}</span>
+      <span className="text-lg font-bold tabular-nums">{value}</span>
+      {detail && <span className="text-base opacity-80">{detail}</span>}
     </div>
   )
 }
@@ -60,7 +58,7 @@ function Controls({ state }: { state: State }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       <button type="button" className={button} disabled={busy} onClick={() => reset.mutate()}>
-        Reset scenario
+        Reset
       </button>
       <label className="flex items-center gap-2">
         <span className="opacity-80">Speed</span>
@@ -71,7 +69,7 @@ function Controls({ state }: { state: State }) {
         >
           {SPEEDS.map((s) => (
             <option key={s} value={s}>
-              {s === 0 ? 'Paused' : `${s} min per second`}
+              {s === 0 ? 'Paused' : `${s} min/s`}
             </option>
           ))}
         </select>
@@ -88,7 +86,7 @@ function Controls({ state }: { state: State }) {
       )}
       {holdEvent && (
         <button type="button" className={button} disabled={busy} onClick={() => fire.mutate(payload(holdEvent))}>
-          Place hold on {String(holdEvent.box)}
+          Hold {String(holdEvent.box)}
         </button>
       )}
       {reeferEvent && state.powered_reefers.length > 0 && (
@@ -111,7 +109,7 @@ function Controls({ state }: { state: State }) {
             disabled={busy || !reeferTarget}
             onClick={() => fire.mutate({ type: 'reefer_power_off', box: reeferTarget })}
           >
-            Cut reefer power
+            Cut power
           </button>
         </span>
       )}
@@ -122,7 +120,7 @@ function Controls({ state }: { state: State }) {
           disabled={busy}
           onClick={() => fire.mutate({ type: isDark ? 'source_back' : 'source_dark', source: darkSource })}
         >
-          {isDark ? `Bring ${darkSource} feed back` : `Take ${darkSource} feed dark`}
+          {`${darkSource.charAt(0).toUpperCase()}${darkSource.slice(1)} feed ${isDark ? 'back' : 'dark'}`}
         </button>
       )}
       {error && <span className="rounded bg-red-100 px-2 py-1 text-red-900">{error.message}</span>}
@@ -156,19 +154,19 @@ function Header({ state }: { state: State }) {
         {state.dark_sources.length > 0 && (
           <span className="rounded-md bg-red-600 px-2 py-1 font-semibold text-white">Dark feed: {state.dark_sources.join(' and ')}</span>
         )}
-        <PollerChip poller={state.poller} />
         <span className="flex items-center gap-2" title={`${state.legend.live}. ${state.legend.simulated}.`}>
           <BadgeChip kind="live" />
           <BadgeChip kind="simulated" />
         </span>
       </div>
-      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div className="flex flex-wrap gap-2">
-          <Counter label="Released" value={String(c.released)} />
-          <Counter label="Reefers powered" value={String(c.reefers_powered)} detail={`${c.reefers_lost} lost`} />
-          <Counter label="Demurrage avoided" value={`${c.demurrage_avoided_usd.toLocaleString('en-US')} USD`} />
-          <Counter label="Throughput" value={`${c.throughput_pct}%`} />
-        </div>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <Counter label="Released" value={String(c.released)} />
+        <Counter label="Reefers powered" value={String(c.reefers_powered)} detail={`${c.reefers_lost} lost`} />
+        <Counter label="Demurrage avoided" value={`${c.demurrage_avoided_usd.toLocaleString('en-US')} USD`} />
+        <Counter label="Throughput" value={`${c.throughput_pct}%`} />
+        <PollerChip poller={state.poller} />
+      </div>
+      <div className="mt-2">
         <Controls state={state} />
       </div>
     </header>

@@ -41,7 +41,7 @@ TERMINAL_FIELDS = (
 )
 STATUS_TEXT = {
     "starting": "Terminal49 poller starting.",
-    "no_key": "No Terminal49 key. Running on the fixture.",
+    "no_key": "No Terminal49 key. Running on fixture.",
     "unauthorized": "Terminal49 key has no read access. Running on the fixture.",
     "error": "Terminal49 unreachable. Running on the fixture.",
     "ok": "Terminal49 live.",
