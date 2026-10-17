@@ -93,12 +93,14 @@ reefer and every last free day box kept.
 
 Click: the **Queue** tab, the **Step** filter, then **HOLD**. Click **MSKU1234567**.
 
-Screen: the box card. HOLD, Planner tap, Owner: customs broker, urgency 95. Point at the conflicts
-list, the reason in large text, and the Warm up clock in the reefer panel.
+Screen: the box card. HOLD, Planner tap, Owner: customs broker, urgency 95. Point at the reason in
+large text, then scroll to the Warm up clock in the reefer panel: power off since 21:00, and "Product
+passed 2.6 C at 21:53".
 
-> This one is chilled beef, under a customs hold, with the power off since nine o'clock, and it is
-> warming. Releasing it is not ours to give. Customs owns that. So Rung says Hold, names the owner, and
-> attaches the reefer evidence for the broker. The planner taps once.
+> This one is chilled beef, under a customs hold, with the power off since nine o'clock. The warm up
+> clock says the product already passed its limit at 21:53. Releasing it is not ours to give. Customs
+> owns that. So Rung says Hold, names the owner, and attaches the reefer evidence the broker needs to
+> move fast. The planner taps once.
 
 Click: **Approve** next to the step chip.
 
