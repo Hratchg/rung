@@ -1,0 +1,448 @@
+"""Scenario loading, synthetic population, scenario clock, and events.
+
+All randomness lives here and is driven by the scenario seed.
+"""
+from __future__ import annotations
+
+import copy
+import json
+import random
+import threading
+import time
+from collections import Counter
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from pathlib import Path
+
+from stdnum import iso6346
+
+from . import config
+from .feeds import ReeferModel, reefer_model, weighbridge_reading
+from .models import CUSTOMS_HOLD_NAMES, Box
+from .timefmt import format_offset, iso, parse_date, parse_dt, parse_offset, window_at
+
+OWNER_CODES = ("MSKU", "TCLU", "CMAU", "HLBU", "ONEU", "MSCU")
+DRAY_CARRIERS = (
+    "Harbor Freight Lines",
+    "Bayline Drayage",
+    "Pacific Coast Dray",
+    "Port Runner Trucking",
+    "Seaside Haulers",
+)
+REEFER_PROFILES = (
+    (-18.0, ("frozen fish", "frozen poultry", "frozen shrimp")),
+    (-1.4, ("chilled beef", "chilled lamb", "chilled pork")),
+    (10.0, ("avocados", "citrus", "tomatoes")),
+)
+NON_REEFER_TYPES = (("dry", 80), ("open top", 6), ("flat rack", 5), ("tank", 5), ("bulk", 4))
+HOLD_KINDS = ("customs", "line", "freight", "TMF")
+HOLD_TEXT = {"customs": "CBP HOLD", "line": "LINE HOLD", "freight": "FREIGHT HOLD", "TMF": "TMF HOLD"}
+DEMURRAGE_PER_DAY = {"reefer": 440, "dry": 275}
+EVENT_TYPES = (
+    "mode",
+    "lanes_down",
+    "lanes_up",
+    "hold_placed",
+    "hold_cleared",
+    "reefer_power_off",
+    "reefer_power_on",
+    "source_dark",
+    "source_back",
+    "fee_increase",
+    "twist",
+)
+
+
+def load_config(path: Path) -> dict:
+    return json.loads(Path(path).read_text())
+
+
+def daily_demurrage(equipment_type: str) -> int:
+    return DEMURRAGE_PER_DAY["reefer" if equipment_type == "reefer" else "dry"]
+
+
+def _weighted_pick(rng: random.Random, items: list, weight, n: int) -> list:
+    keyed = [(rng.random() ** (1.0 / weight(item)), idx, item) for idx, item in enumerate(items)]
+    keyed.sort(key=lambda k: (-k[0], k[1]))
+    return [item for _, _, item in keyed[:n]]
+
+
+def generate_synthetic(cfg: dict) -> list[dict]:
+    syn = cfg["synthetic"]
+    rng = random.Random(cfg["seed"])
+    start = parse_dt(cfg["clock_start"])
+    today = start.date()
+    term = cfg["terminal"]
+    windows: list[str] = term["windows"]
+    fixed = cfg.get("containers", [])
+    count = int(syn["count"])
+
+    taken = {c["number"] for c in fixed}
+    numbers: list[str] = []
+    while len(numbers) < count:
+        base = rng.choice(OWNER_CODES) + f"{rng.randrange(1_000_000):06d}"
+        number = base + iso6346.calc_check_digit(base)
+        if number not in taken:
+            taken.add(number)
+            numbers.append(number)
+
+    reefer_idx = sorted(rng.sample(range(count), round(count * syn["reefer_share"])))
+    reefer_profile = {i: REEFER_PROFILES[k % 3] for k, i in enumerate(reefer_idx)}
+
+    hold_idx = sorted(rng.sample(range(count), round(count * syn["hold_rate"])))
+    holds: dict[int, dict] = {}
+    for k, i in enumerate(hold_idx):
+        name = HOLD_KINDS[k % len(HOLD_KINDS)]
+        holds[i] = {"name": name, "status": "pending" if k % 5 == 4 else "hold", "description": HOLD_TEXT[name]}
+
+    units = [(lane, w, k) for lane in range(1, term["lanes"] + 1) for w in windows for k in range(term["capacity_per_lane_hour"])]
+    used = Counter((c["appointment"]["lane"], c["appointment"]["window"]) for c in fixed if c.get("appointment"))
+    skipped: Counter = Counter()
+    free = []
+    for lane, w, k in units:
+        if skipped[(lane, w)] < used[(lane, w)]:
+            skipped[(lane, w)] += 1
+            continue
+        free.append((lane, w, k))
+    target = round(len(units) * (1 - syn["empty_slot_share"])) - sum(used.values())
+    target = max(0, min(target, len(free), count))
+    afternoon = {w for w in windows if "13:00" <= w <= "18:00"}
+    tuesday = cfg.get("mode", "tuesday") == "tuesday" and afternoon
+
+    def weight(unit):
+        return 3.0 if tuesday and unit[1] in afternoon else 1.0
+
+    chosen_units = _weighted_pick(rng, free, weight, target)
+    appt_boxes = rng.sample(range(count), target)
+    no_shows = set(rng.sample(range(target), round(target * syn["no_show_rate"])))
+    appointment_for = {}
+    for j, (i, unit) in enumerate(zip(appt_boxes, chosen_units)):
+        lane, w, _ = unit
+        appointment_for[i] = {
+            "lane": lane,
+            "window": w,
+            "dray_carrier": rng.choice(DRAY_CARRIERS),
+            "trucker_phone": f"+1310555{rng.randrange(10_000):04d}",
+            "no_show": j in no_shows,
+        }
+
+    boxes: list[dict] = []
+    for i, number in enumerate(numbers):
+        profile = reefer_profile.get(i)
+        if profile:
+            equipment_type = "reefer"
+            length = 40
+        else:
+            equipment_type = rng.choices([t for t, _ in NON_REEFER_TYPES], [w for _, w in NON_REEFER_TYPES])[0]
+            length = rng.choices([20, 40, 45], [30, 60, 10])[0]
+        weight_lb = round(rng.randint(4000, 48000), -1)
+        hold = holds.get(i)
+        active = hold is not None and hold["status"] == "hold"
+        lfd = today + timedelta(days=rng.randint(-1, 6))
+        days_past = (today - lfd).days
+        fees = []
+        if days_past > 0:
+            fees.append({"type": "demurrage", "amount": days_past * daily_demurrage(equipment_type), "currency_code": "USD"})
+        appt = appointment_for.get(i)
+        appt_at = window_at(appt["window"], start) if appt else None
+        arrived = start - timedelta(hours=rng.uniform(30, 140))
+        block = "R" if profile else rng.choice("ABCDEFG")
+        box = {
+            "number": number,
+            "live": False,
+            "synthetic": True,
+            "carrier": {
+                "weight_in_lbs": weight_lb,
+                "equipment_type": equipment_type,
+                "equipment_length": length,
+                "current_status": "not_available" if active else "available",
+                "seal_number": f"SL{rng.randrange(10_000_000):07d}",
+                "pod_arrived_at": iso(arrived),
+                "pod_discharged_at": iso(arrived + timedelta(hours=rng.uniform(4, 18))),
+                "observed_at": iso(start - timedelta(minutes=rng.randint(20, 360))),
+            },
+            "terminal": {
+                "available_for_pickup": not active,
+                "availability_known": True,
+                "pickup_lfd": lfd.isoformat(),
+                "fees_at_pod_terminal": fees,
+                "location_at_pod_terminal": f"{block}-{rng.randint(1, 30):02d}-{rng.randint(1, 6):02d}",
+                "pickup_appointment_at": iso(appt_at),
+                "terminal_checked_at": iso(start - timedelta(minutes=rng.randint(5, 45))),
+                "holds": [hold] if hold and hold["name"] not in CUSTOMS_HOLD_NAMES else [],
+            },
+            "customs": {
+                "holds": [hold] if hold and hold["name"] in CUSTOMS_HOLD_NAMES else [],
+                "observed_at": iso(start - timedelta(minutes=rng.randint(10, 60))),
+            },
+            "weighbridge": {
+                "measured_weight_lbs": round(weight_lb * (1 + rng.uniform(0.01, 0.03)), -1),
+                "measured_at": iso(start - timedelta(minutes=rng.randint(10, 120))),
+                "method": rng.choice(("gate_weighbridge", "crane_load_cell")),
+            },
+            "appointment": appt,
+        }
+        if profile:
+            set_point, cargos = profile
+            box["reefer"] = {
+                "set_point_c": set_point,
+                "air_temp_c": round(set_point + rng.uniform(0.2, 0.8), 1),
+                "product_temp_c": round(set_point + rng.uniform(0.0, 0.4), 1),
+                "power_on": True,
+                "last_seen": iso(start - timedelta(minutes=rng.randint(0, 59))),
+                "cargo": rng.choice(cargos),
+            }
+        boxes.append(box)
+
+    def plain_candidates():
+        for b in boxes:
+            if b["carrier"]["equipment_type"] == "dry" and b["appointment"] and not b["customs"]["holds"] and not b["terminal"]["holds"]:
+                if parse_date(b["terminal"]["pickup_lfd"]) > today:
+                    yield b
+
+    picks = plain_candidates()
+    heavy = next(picks)
+    heavy["carrier"]["weight_in_lbs"] = 36000
+    heavy["weighbridge"]["measured_weight_lbs"] = 40500
+    heavy["weight_case"] = "heavy"
+    empty = next(picks)
+    empty["carrier"]["weight_in_lbs"] = 4400
+    empty["carrier"]["current_status"] = "empty"
+    empty["weighbridge"]["measured_weight_lbs"] = 41000
+    empty["weight_case"] = "declared_empty"
+
+    present = {b["number"] for b in boxes} | {c["number"] for c in fixed}
+    for event in cfg.get("events", []):
+        wanted = event.get("box")
+        if wanted and wanted not in present:
+            target_box = next(picks)
+            target_box["number"] = wanted
+            present.add(wanted)
+    return boxes
+
+
+class Clock:
+    def __init__(self, start: datetime, minutes_per_second: float):
+        self.anchor_sim = start
+        self.anchor_real = time.monotonic()
+        self.minutes_per_second = minutes_per_second
+
+    def now(self) -> datetime:
+        elapsed = time.monotonic() - self.anchor_real
+        t = self.anchor_sim + timedelta(minutes=elapsed * self.minutes_per_second)
+        return t.replace(microsecond=0)
+
+    def set_now(self, t: datetime) -> None:
+        self.anchor_sim = t
+        self.anchor_real = time.monotonic()
+
+    def set_speed(self, minutes_per_second: float) -> None:
+        self.set_now(self.now())
+        self.minutes_per_second = minutes_per_second
+
+
+@dataclass
+class BoxState:
+    number: str
+    live: bool
+    synthetic: bool
+    carrier: dict | None
+    terminal: dict | None
+    customs: dict | None
+    weighbridge: dict | None
+    reefer_model: ReeferModel | None
+    appointment: dict | None
+    weight_case: str | None = None
+    live_sources: set[str] = field(default_factory=set)
+    weight_asked: bool = False
+    pending_release: bool = False
+
+    def reefer_reading(self, now: datetime) -> dict | None:
+        return self.reefer_model.reading(now) if self.reefer_model else None
+
+
+class Scenario:
+    def __init__(self, path: Path | None = None, minutes_per_second: float | None = None):
+        self.path = Path(path or config.SCENARIO_PATH)
+        self.lock = threading.RLock()
+        self.speed = config.MINUTES_PER_SECOND if minutes_per_second is None else minutes_per_second
+        self.resets = 0
+        self.reset()
+
+    def reset(self) -> None:
+        with self.lock:
+            cfg = load_config(self.path)
+            self.cfg = cfg
+            self.seed = int(cfg["seed"])
+            self.start = parse_dt(cfg["clock_start"])
+            self.tz = self.start.tzinfo
+            term = cfg["terminal"]
+            self.terminal_name = term["name"]
+            self.lane_count = int(term["lanes"])
+            self.windows = list(term["windows"])
+            self.capacity = int(term["capacity_per_lane_hour"])
+            self.mode = cfg.get("mode", "tuesday")
+            self.lanes_closed: set[int] = set()
+            self.dark_sources: dict[str, datetime] = {}
+            self.events = sorted(
+                ((self.start + parse_offset(e["t"]), i, e) for i, e in enumerate(cfg.get("events", []))),
+                key=lambda x: (x[0], x[1]),
+            )
+            self.next_event = 0
+            self.event_log: list[dict] = []
+            self.twists: list[dict] = []
+            self.boxes: dict[str, BoxState] = {}
+            for c in list(cfg.get("containers", [])) + generate_synthetic(cfg):
+                state = self._box_state(c)
+                self.boxes[state.number] = state
+            self.clock = Clock(self.start, self.speed)
+            self.now = self.start
+            self.resets += 1
+            self._advance_to(self.start)
+
+    def _box_state(self, c: dict) -> BoxState:
+        c = copy.deepcopy(c)
+        appt = c.get("appointment")
+        if appt:
+            appt.setdefault("no_show", False)
+            appt["at"] = iso(window_at(appt["window"], self.start))
+        terminal = c.get("terminal")
+        if terminal is not None:
+            terminal.setdefault("holds", [])
+        reefer = c.get("reefer")
+        return BoxState(
+            number=c["number"],
+            live=bool(c.get("live")),
+            synthetic=bool(c.get("synthetic")),
+            carrier=c.get("carrier"),
+            terminal=terminal,
+            customs=c.get("customs"),
+            weighbridge=c.get("weighbridge"),
+            reefer_model=reefer_model(c["number"], self.seed, reefer, parse_dt) if reefer else None,
+            appointment=appt,
+            weight_case=c.get("weight_case"),
+        )
+
+    def box_view(self, state: BoxState, now: datetime | None = None) -> Box:
+        now = now or self.now
+        return Box(
+            number=state.number,
+            live=state.live,
+            carrier=copy.deepcopy(state.carrier),
+            terminal=copy.deepcopy(state.terminal),
+            customs=copy.deepcopy(state.customs),
+            weighbridge=weighbridge_reading(state.weighbridge),
+            reefer=state.reefer_reading(now),
+            appointment=copy.deepcopy(state.appointment),
+            dark_sources=frozenset(self.dark_sources),
+            lanes_closed=frozenset(self.lanes_closed),
+            weight_asked=state.weight_asked,
+            pending_release=state.pending_release,
+            live_sources=frozenset(state.live_sources),
+        )
+
+    def advance(self) -> datetime:
+        with self.lock:
+            self._advance_to(max(self.now, self.clock.now()))
+            return self.now
+
+    def _advance_to(self, t: datetime) -> None:
+        while self.next_event < len(self.events) and self.events[self.next_event][0] <= t:
+            at, _, event = self.events[self.next_event]
+            self.next_event += 1
+            self.apply_event(event, at, scripted=True)
+        self.now = t
+        self.after_advance()
+
+    def after_advance(self) -> None:
+        """Evaluation hook. Phase 1 evaluates every box here."""
+
+    def jump(self, t: str) -> None:
+        with self.lock:
+            target = self.start + parse_offset(t)
+            if target < self.now:
+                self.reset()
+            self.clock.set_now(target)
+            self._advance_to(target)
+
+    def set_speed(self, minutes_per_second: float) -> None:
+        with self.lock:
+            self.advance()
+            self.speed = minutes_per_second
+            self.clock.set_speed(minutes_per_second)
+
+    def post_event(self, event: dict) -> dict:
+        with self.lock:
+            self.advance()
+            entry = self.apply_event(event, self.now, scripted=False)
+            self.after_advance()
+            return entry
+
+    def apply_event(self, event: dict, at: datetime, scripted: bool) -> dict:
+        kind = event.get("type")
+        if kind not in EVENT_TYPES:
+            raise ValueError(f"Unknown event type {kind}")
+        entry = {"at": iso(at), "offset": format_offset(at - self.start), "scripted": scripted, **event}
+        box = self.boxes.get(event.get("box", ""))
+        if event.get("box") and box is None:
+            entry["ignored"] = "unknown box"
+        elif kind == "mode":
+            self.mode = event["mode"]
+        elif kind == "lanes_down":
+            self.lanes_closed |= {int(x) for x in event["lanes"]}
+        elif kind == "lanes_up":
+            self.lanes_closed -= {int(x) for x in event["lanes"]}
+        elif kind == "hold_placed":
+            hold = dict(event["hold"])
+            target = box.customs if hold["name"] in CUSTOMS_HOLD_NAMES else box.terminal
+            stamp = "observed_at" if target is box.customs else "terminal_checked_at"
+            target["holds"] = [h for h in target.get("holds", []) if h["name"] != hold["name"]] + [hold]
+            target[stamp] = iso(at)
+        elif kind == "hold_cleared":
+            name = (event.get("hold") or {}).get("name") or event.get("name")
+            for target, stamp in ((box.customs, "observed_at"), (box.terminal, "terminal_checked_at")):
+                if target and any(h["name"] == name for h in target.get("holds", [])):
+                    target["holds"] = [h for h in target["holds"] if h["name"] != name]
+                    target[stamp] = iso(at)
+        elif kind in ("reefer_power_off", "reefer_power_on"):
+            if box.reefer_model is None:
+                entry["ignored"] = "not a reefer"
+            else:
+                box.reefer_model.set_power(at, kind == "reefer_power_on")
+        elif kind == "source_dark":
+            self.dark_sources.setdefault(event["source"], at)
+        elif kind == "source_back":
+            self.dark_sources.pop(event["source"], None)
+        elif kind == "fee_increase":
+            fee = event.get("fee") or {"type": "demurrage", "amount": event.get("amount", 0), "currency_code": "USD"}
+            fees = box.terminal.setdefault("fees_at_pod_terminal", [])
+            match = next((f for f in fees if f["type"] == fee["type"]), None)
+            if match:
+                match["amount"] = match["amount"] + fee["amount"]
+            else:
+                fees.append(dict(fee))
+        elif kind == "twist":
+            self.twists.append(
+                {
+                    "tag": event.get("tag"),
+                    "note": event.get("note", ""),
+                    "received_at": iso(at),
+                    "received_wall": iso(datetime.now().astimezone()),
+                    "added": [],
+                    "merged_at": None,
+                }
+            )
+        self.event_log.append(entry)
+        return entry
+
+    def scripted_events(self) -> list[dict]:
+        return [
+            {**event, "at": iso(at), "fired": idx < self.next_event}
+            for idx, (at, _, event) in enumerate(self.events)
+        ]
+
+    def carriers(self) -> list[str]:
+        return sorted({b.appointment["dray_carrier"] for b in self.boxes.values() if b.appointment})
+
+    def lanes_open(self) -> list[int]:
+        return [lane for lane in range(1, self.lane_count + 1) if lane not in self.lanes_closed]

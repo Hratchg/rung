@@ -1,0 +1,33 @@
+{
+  "seed": 7,
+  "terminal": {
+    "name": "Pier 7",
+    "lanes": 6,
+    "capacity_per_lane_hour": 4,
+    "windows": ["22:00", "23:00", "00:00", "01:00", "02:00", "03:00", "04:00", "05:00"]
+  },
+  "clock_start": "2026-10-18T22:00:00-07:00",
+  "mode": "tuesday",
+  "live_container_numbers": ["MSKU1234567"],
+  "containers": [
+    {
+      "number": "MSKU1234567",
+      "live": false,
+      "carrier": {"weight_in_lbs": 2400, "equipment_type": "reefer", "equipment_length": 40, "current_status": "available", "observed_at": "2026-10-18T20:00:00-07:00"},
+      "terminal": {"available_for_pickup": true, "availability_known": true, "pickup_lfd": "2026-10-19", "fees_at_pod_terminal": [{"type": "demurrage", "amount": 440, "currency_code": "USD"}], "location_at_pod_terminal": "R-12-04", "pickup_appointment_at": "2026-10-19T01:00:00-07:00", "terminal_checked_at": "2026-10-18T21:40:00-07:00"},
+      "customs": {"holds": [{"name": "customs", "status": "hold", "description": "CBP HOLD"}], "observed_at": "2026-10-18T21:40:00-07:00"},
+      "weighbridge": {"measured_weight_lbs": 44100, "measured_at": "2026-10-18T21:55:00-07:00", "method": "gate_weighbridge"},
+      "reefer": {"set_point_c": -1.4, "air_temp_c": 1.9, "product_temp_c": -0.2, "power_on": false, "last_seen": "2026-10-18T21:00:00-07:00", "cargo": "chilled beef"},
+      "appointment": {"lane": 5, "window": "01:00", "dray_carrier": "Harbor Freight Lines", "trucker_phone": "+13105550100"}
+    }
+  ],
+  "synthetic": {"count": 190, "reefer_share": 0.15, "hold_rate": 0.08, "no_show_rate": 0.15, "empty_slot_share": 0.33},
+  "events": [
+    {"t": "+00:05", "type": "mode", "mode": "harbor_night"},
+    {"t": "+00:10", "type": "lanes_down", "lanes": [4, 5, 6]},
+    {"t": "+00:20", "type": "hold_placed", "box": "TCLU7654321", "hold": {"name": "customs", "status": "hold", "description": "CBP HOLD"}},
+    {"t": "+00:25", "type": "reefer_power_off", "box": "MSKU1234567"},
+    {"t": "+00:40", "type": "source_dark", "source": "terminal"},
+    {"t": "+01:00", "type": "twist", "tag": "twist-1", "note": "paste the twist text here"}
+  ]
+}
