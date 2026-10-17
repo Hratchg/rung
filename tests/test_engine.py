@@ -265,11 +265,18 @@ def test_demurrage_releases_up_the_queue():
     assert d.step == "RELEASE" and d.pinned and d.hand
 
 
-def test_no_rule_falls_back_to_watch():
+def test_clean_urgent_box_still_releases():
     box = with_source(clear_box(), "terminal", pickup_lfd=START.date().isoformat())
     d = evaluate(box, START)
     assert d.urgency >= 30
+    assert d.fired == ["R0"] and d.step == "RELEASE" and d.hand is False
+
+
+def test_no_rule_falls_back_to_watch():
+    box = with_source(clear_box(), "terminal", availability_known=False)
+    d = evaluate(box, START)
     assert d.fired == [] and d.step == "WATCH"
+    assert d.reason.startswith("No rule matched this box.")
 
 
 def test_urgency_is_capped():
@@ -289,3 +296,30 @@ def test_reason_copy_has_no_contractions_dashes_or_semicolons():
         sc.jump(t)
         for state in sc.boxes.values():
             assert not bad.search(state.decision.reason), state.decision.reason
+
+
+# Phase 2 decisions.
+
+
+def test_dark_terminal_hands_only_boxes_whose_truck_is_due():
+    sc = Scenario(minutes_per_second=0)
+    sc.jump("+00:39")
+    due = {n for n, s in sc.boxes.items() if s.pending_release}
+    sc.jump("+00:40")
+    hand = {n for n, s in sc.boxes.items() if s.decision.step == "HAND"}
+    assert hand == due and 0 < len(hand) < 40
+    for n in hand:
+        hours = (parse_dt(sc.boxes[n].appointment["at"]) - sc.now).total_seconds() / 3600
+        assert -1 < hours <= 2.7
+    assert all(s.decision.votes["R10"] == "WATCH" for n, s in sc.boxes.items() if "R10" in s.decision.fired and n not in hand)
+
+
+def test_warmup_clock_matches_csiro_for_frozen_cargo():
+    from backend.feeds import ReeferModel, warmup
+
+    model = ReeferModel("CMAU0000000", 7, -18.0, "frozen fish", START, -18.5, -18.0, True)
+    model.set_power(START, False)
+    w = warmup(model, START + timedelta(hours=1))
+    assert w["limit_c"] == -10.0 and w["note"].startswith("CSIRO 2007.")
+    assert w["hours_left"] == pytest.approx(18.0, abs=0.05)
+    assert warmup(ReeferModel("CMAU0000000", 7, -1.4, "chilled beef", START, -1.0, -1.4, True), START)["power_on"] is True

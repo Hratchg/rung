@@ -1,16 +1,8 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { STEPS, useDecision, useQueue, type QueueRow, type Step } from './api'
+import { useQueue, type QueueRow, type Step } from './api'
+import { OverrideDialog, PlannerActions } from './Decide'
 import { GROUP_ORDER, STEP_META } from './format'
 import { SourceBadges, StepChip, UrgencyBar } from './ui'
-
-const APPROVE_LABEL: Record<Step, string> = {
-  RELEASE: 'Release',
-  WATCH: 'Approve',
-  ASK: 'Run ask',
-  SLOW: 'Approve',
-  HOLD: 'Approve',
-  HAND: 'Decide',
-}
 
 export default function Queue({ carriers }: { carriers: string[] }) {
   const [carrier, setCarrier] = useState('')
@@ -108,12 +100,12 @@ export default function Queue({ carriers }: { carriers: string[] }) {
         </div>
       )}
 
-      {overriding && <OverrideDialog row={overriding} onClose={() => setOverriding(null)} />}
+      {overriding && <OverrideDialog target={overriding} onClose={() => setOverriding(null)} />}
     </main>
   )
 }
 
-function Notice({ children, tone = 'info' }: { children: ReactNode; tone?: 'info' | 'error' }) {
+export function Notice({ children, tone = 'info' }: { children: ReactNode; tone?: 'info' | 'error' }) {
   return (
     <p className={`rounded-lg border px-4 py-6 text-center text-lg ${tone === 'error' ? 'border-red-300 bg-red-50 text-red-900' : 'border-slate-300 bg-white text-slate-700'}`}>
       {children}
@@ -123,14 +115,17 @@ function Notice({ children, tone = 'info' }: { children: ReactNode; tone?: 'info
 
 function Row({ row, onOverride }: { row: QueueRow; onOverride: () => void }) {
   const [open, setOpen] = useState(false)
-  const decide = useDecision()
-  const approved = row.planner?.action === 'approve'
-  const overridden = row.planner?.action === 'override'
   const { lfd, reefer, appointment } = row.clocks
   return (
     <tr className="border-t border-slate-200 align-top hover:bg-slate-50">
       <td className="px-3 py-2">
-        <div className="font-mono text-lg font-semibold">{row.number}</div>
+        <a
+          href={`#/box/${row.number}`}
+          className="font-mono text-lg font-semibold text-sky-900 underline decoration-sky-300 underline-offset-4 hover:decoration-sky-800"
+          title="Open the box card"
+        >
+          {row.number}
+        </a>
         <div className="text-slate-600">
           {row.equipment_type}
           {row.equipment_length ? ` ${row.equipment_length} ft` : ''}
@@ -168,96 +163,8 @@ function Row({ row, onOverride }: { row: QueueRow; onOverride: () => void }) {
         <SourceBadges badges={row.badges} />
       </td>
       <td className="px-3 py-2">
-        <div className="flex flex-col gap-1.5">
-          {approved && <span className="font-semibold text-emerald-800">Approved</span>}
-          {overridden && <span className="font-semibold text-violet-800">Planner set {row.planner!.step}</span>}
-          {!approved && row.step !== 'HAND' && (
-            <button
-              type="button"
-              disabled={decide.isPending}
-              onClick={() => decide.mutate({ box: row.number, action: 'approve' })}
-              className="rounded bg-slate-900 px-3 py-1.5 font-semibold text-white hover:bg-slate-700 disabled:opacity-50"
-            >
-              {APPROVE_LABEL[row.step]}
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={onOverride}
-            className={`rounded px-3 py-1.5 font-semibold ${row.step === 'HAND' ? 'bg-violet-700 text-white hover:bg-violet-600' : 'border border-slate-400 bg-white hover:bg-slate-100'}`}
-          >
-            {row.step === 'HAND' ? 'Decide' : 'Override'}
-          </button>
-          {decide.isError && <span className="text-red-800">{decide.error.message}</span>}
-        </div>
+        <PlannerActions target={row} onOverride={onOverride} />
       </td>
     </tr>
-  )
-}
-
-function OverrideDialog({ row, onClose }: { row: QueueRow; onClose: () => void }) {
-  const [step, setStep] = useState<Step | null>(null)
-  const [note, setNote] = useState('')
-  const decide = useDecision()
-  const submit = () => {
-    if (!step) return
-    decide.mutate({ box: row.number, action: 'override', step, note }, { onSuccess: onClose })
-  }
-  return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-900/50 p-4" onClick={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="override-title"
-        className="w-full max-w-xl rounded-xl bg-white p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.key === 'Escape' && onClose()}
-      >
-        <h3 id="override-title" className="text-xl font-bold">
-          {row.step === 'HAND' ? 'Decide' : 'Override'} <span className="font-mono">{row.number}</span>
-        </h3>
-        <p className="mt-1 text-slate-700">
-          Rung recommends <StepChip step={row.engine_step} />. Pick the step you want instead.
-        </p>
-        <div className="mt-4 grid grid-cols-3 gap-2">
-          {STEPS.map((s) => (
-            <button
-              key={s}
-              type="button"
-              aria-pressed={step === s}
-              onClick={() => setStep(s)}
-              className={`rounded-lg border-2 px-3 py-2 text-left ${step === s ? 'border-slate-900 bg-slate-100' : 'border-slate-200 hover:border-slate-400'}`}
-            >
-              <StepChip step={s} />
-              {s === row.engine_step && <span className="ml-2 text-slate-600">Recommended</span>}
-            </button>
-          ))}
-        </div>
-        <label className="mt-4 block">
-          <span className="text-base font-semibold">Note for the audit log</span>
-          <textarea
-            className="mt-1 w-full rounded border border-slate-300 p-2 text-base"
-            rows={3}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Why you chose this step"
-          />
-        </label>
-        {decide.isError && <p className="mt-2 text-red-800">{decide.error.message}</p>}
-        <div className="mt-4 flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="rounded border border-slate-400 px-4 py-2 font-semibold hover:bg-slate-100">
-            Cancel
-          </button>
-          <button
-            type="button"
-            disabled={!step || decide.isPending}
-            onClick={submit}
-            className="rounded bg-slate-900 px-4 py-2 font-semibold text-white hover:bg-slate-700 disabled:opacity-40"
-          >
-            Save decision
-          </button>
-        </div>
-      </div>
-    </div>
   )
 }

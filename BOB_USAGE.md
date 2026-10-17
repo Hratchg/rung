@@ -17,3 +17,12 @@ One entry per phase. Each entry says what the assistant produced and what a huma
 - It built the header with counters, poller status, legend, and scenario controls, plus the Queue screen grouped by step with Approve, Override, and badges.
 - It wrote 36 tests covering the Harbor Night box, a clear box, a C2 box, a dark terminal with a pending release, the queue reorder on reefer power loss, reset twice, and the poller fallback.
 - Human check: the list of spec gaps and the choices made for them in the phase report.
+
+## Entry 3. Phase 2, Rung
+
+- Asked the assistant to build the box card and the audit and twist panels, and to settle the open Phase 1 decisions with the spec's tie break rule.
+- It dropped the urgency gate on R0 so clean urgent boxes release, and narrowed "pending release" to RELEASE boxes whose truck is due within 2 h, which cut the dark terminal HAND count from 104 to 21.
+- It added rule names, files, and per rule sentences to decisions, a reefer warm up clock with the CSIRO note, `twists.json` for merged twists, and a limit on `GET /api/audit`.
+- It built `BoxCard.tsx` with five source panels, trust bars with the trust reason on hover, conflicts with both values, fired rules, the reason, and history, plus `Audit.tsx` with the audit and twist panels.
+- It added 8 tests. The suite has 44 tests.
+- Human check: the warm up clock wording and the loss limits, 8 C over the set point for frozen cargo and 4 C over for the rest.

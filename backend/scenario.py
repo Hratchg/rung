@@ -19,7 +19,7 @@ from stdnum import iso6346
 from . import config
 from .audit import Audit, decision_line
 from .engine import evaluate
-from .feeds import ReeferModel, cargo_kind, reefer_model, weighbridge_reading
+from .feeds import ReeferModel, loss_limit_c, reefer_model, weighbridge_reading
 from .models import CUSTOMS_HOLD_NAMES, STEPS, Box, Decision
 from .t49 import map_container
 from .timefmt import format_offset, hours_between, iso, lfd_deadline, parse_date, parse_dt, parse_offset, window_at
@@ -396,10 +396,17 @@ class Scenario:
             state.signature = sig
         state.decision = d
         if d.step == "RELEASE":
-            state.pending_release = True
+            state.pending_release = self._truck_due(state)
         elif not ("R10" in d.fired and state.pending_release):
             state.pending_release = False
         return d
+
+    def _truck_due(self, state: BoxState) -> bool:
+        """Pending release means a RELEASE box whose truck is due, the same window urgency uses."""
+        if not state.appointment:
+            return False
+        hours = hours_between(parse_dt(state.appointment["at"]), self.now)
+        return -1 < hours <= 2
 
     def effective(self, state: BoxState) -> dict:
         d = state.decision
@@ -517,8 +524,7 @@ class Scenario:
             reading = s.reefer_reading(self.now)
             if reading["power_on"]:
                 powered += 1
-            limit = 8.0 if cargo_kind(reading["set_point_c"]) == "frozen" else 4.0
-            if reading["product_temp_c"] - reading["set_point_c"] >= limit:
+            if reading["product_temp_c"] >= loss_limit_c(reading["set_point_c"]):
                 lost += 1
         due = [s for s in self.boxes.values() if s.appointment and parse_dt(s.appointment["at"]) <= self.now]
         released_due = [s for s in due if s.released_at]

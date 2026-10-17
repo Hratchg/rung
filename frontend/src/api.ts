@@ -82,6 +82,112 @@ export type QueueRow = {
   badges: Record<SourceName, Badge>
 }
 
+export type ConflictInfo = {
+  code: string
+  sources: string[]
+  values: Record<string, unknown>
+  sentence: string
+}
+
+export type FiredRule = {
+  id: string
+  name: string
+  step: Step
+  why: string
+  file: string
+  twist_tag: string | null
+}
+
+export type SourceDetail = {
+  fields: Record<string, unknown>
+  observed_at: string | null
+  age: string
+  age_h: number | null
+  trust: number
+  trust_reason: string
+  badge: Badge
+  dark: boolean
+}
+
+export type EffectiveDecision = {
+  box: string
+  step: Step
+  engine_step: Step
+  hand: boolean
+  urgency: number
+  fired: string[]
+  conflicts: string[]
+  trust: Record<SourceName, number>
+  reason: string
+  owner: string | null
+  pinned: boolean
+  planner: Planner | null
+  released_at: string | null
+}
+
+export type Warmup = {
+  kind: 'frozen' | 'chilled' | 'produce'
+  limit_c: number
+  note: string
+  power_on: boolean
+  off_since: string | null
+  hours_off: number
+  limit_at: string | null
+  hours_left: number | null
+}
+
+export type AuditLine = {
+  seq: number
+  ts: string
+  box: string
+  step: Step
+  hand: boolean
+  previous_step: Step | null
+  fired: string[]
+  conflicts: string[]
+  urgency: number
+  trust: Record<SourceName, number>
+  reason: string
+  owner: string | null
+  actor: 'engine' | 'planner' | string
+  override: boolean
+  note: string
+  twist_tag: string | null
+  action?: string
+  effect?: string
+}
+
+export type BoxDetail = {
+  number: string
+  live: boolean
+  equipment_type: string
+  equipment_length: number | null
+  appointment: { lane: number; window: string; dray_carrier: string; trucker_phone: string; no_show: boolean; at: string } | null
+  mode: string
+  sources: Record<SourceName, SourceDetail | null>
+  conflicts: ConflictInfo[]
+  fired: FiredRule[]
+  decision: EffectiveDecision
+  clocks: Clocks
+  warmup: Warmup | null
+  history: AuditLine[]
+  call: unknown
+}
+
+export type TwistAdded = { kind: string; id: string | null; name: string; file: string; created_at: string | null }
+
+export type Twist = {
+  tag: string
+  text: string
+  received_at: string | null
+  received_wall: string | null
+  merged_at: string | null
+  added: TwistAdded[]
+  status: 'received' | 'merged'
+}
+
+export type AuditPayload = { lines: AuditLine[]; total: number; twists: Twist[] }
+
 export type DecisionBody = {
   box: string
   action: 'approve' | 'override'
@@ -121,6 +227,25 @@ export function useQueue(filters: { carrier: string; step: string }) {
   return useQuery({
     queryKey: ['queue', filters],
     queryFn: () => request<QueueRow[]>(`/api/queue${qs ? `?${qs}` : ''}`),
+    placeholderData: (previous) => previous,
+  })
+}
+
+export function useBox(number: string) {
+  return useQuery({
+    queryKey: ['box', number],
+    queryFn: () => request<BoxDetail>(`/api/box/${encodeURIComponent(number)}`),
+    placeholderData: (previous) => (previous?.number === number ? previous : undefined),
+    retry: (count, error) => !error.message.includes('not found') && count < 1,
+  })
+}
+
+export function useAudit(filters: { box: string; limit: number }) {
+  const params = new URLSearchParams({ limit: String(filters.limit) })
+  if (filters.box) params.set('box', filters.box)
+  return useQuery({
+    queryKey: ['audit', filters],
+    queryFn: () => request<AuditPayload>(`/api/audit?${params.toString()}`),
     placeholderData: (previous) => previous,
   })
 }

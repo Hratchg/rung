@@ -16,6 +16,8 @@ def load_rules() -> list[Rule]:
         rule = getattr(module, "RULE", None)
         if isinstance(rule, Rule):
             rule.created_at = getattr(module, "created_at", rule.created_at)
+            rule.name = rule.name or info.name.partition("_")[2].replace("_", " ")
+            rule.file = f"backend/rules/{info.name}.py"
             rules.append(rule)
     rules.sort(key=lambda r: (r.order, r.id))
     return rules

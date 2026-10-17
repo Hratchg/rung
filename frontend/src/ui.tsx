@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { SOURCE_NAMES, type Badge, type SourceName, type Step } from './api'
-import { STEP_META } from './format'
+import { STEP_META, trustLevel } from './format'
 
 export function StepChip({ step, size = 'md' }: { step: Step; size?: 'md' | 'lg' }) {
   return (
@@ -22,6 +22,27 @@ export function UrgencyBar({ value }: { value: number }) {
         <div className={`h-full ${tone}`} style={{ width: `${Math.max(3, value)}%` }} />
       </div>
       <span className="w-8 text-right text-lg font-semibold tabular-nums">{value}</span>
+    </div>
+  )
+}
+
+export function TrustBar({ value, reason }: { value: number; reason: string }) {
+  const level = trustLevel(value)
+  return (
+    <div className="group relative" tabIndex={0} aria-label={`Trust ${value.toFixed(2)}, ${level.label}. ${reason}`}>
+      <div className="flex items-center gap-2">
+        <div className="h-3 flex-1 overflow-hidden rounded-full bg-slate-200">
+          <div className={`h-full ${level.bar}`} style={{ width: `${Math.round(value * 100)}%` }} />
+        </div>
+        <span className="text-lg font-bold tabular-nums">{value.toFixed(2)}</span>
+        <span className={`font-semibold ${level.text}`}>{level.label}</span>
+      </div>
+      <div
+        role="tooltip"
+        className="pointer-events-none absolute left-0 top-full z-30 mt-1 hidden w-72 rounded-md bg-slate-900 px-3 py-2 text-base text-white shadow-lg group-hover:block group-focus:block"
+      >
+        {reason}
+      </div>
     </div>
   )
 }

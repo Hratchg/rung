@@ -32,7 +32,7 @@ class Audit:
         with self.lock:
             self.buffer.clear()
 
-    def lines(self, since: str | None = None, box: str | None = None) -> list[dict]:
+    def lines(self, since: str | None = None, box: str | None = None, limit: int = 0) -> list[dict]:
         with self.lock:
             items = list(self.buffer)
         if since:
@@ -41,8 +41,56 @@ class Audit:
             else:
                 items = [x for x in items if x["ts"] > since]
         if box:
-            items = [x for x in items if x["box"] == box]
-        return items[::-1]
+            items = [x for x in items if box in x["box"]]
+        items.reverse()
+        return items[:limit] if limit > 0 else items
+
+
+def load_twist_file(path: Path | None) -> list[dict]:
+    """twists.json holds one entry per merged TWIST: tag, text, received_at, merged_at, added (file paths)."""
+    if not path:
+        return []
+    try:
+        data = json.loads(Path(path).read_text())
+    except (OSError, ValueError):
+        return []
+    return data if isinstance(data, list) else []
+
+
+def twist_log(scenario_twists: list[dict], rules: list, path: Path | None) -> list[dict]:
+    """One row per twist tag, newest first, joining scenario twist events, twists.json, and tagged rule files."""
+    rows: dict[str, dict] = {}
+
+    def row(tag: str) -> dict:
+        return rows.setdefault(
+            tag,
+            {"tag": tag, "text": "", "received_at": None, "received_wall": None, "merged_at": None, "added": []},
+        )
+
+    for t in scenario_twists:
+        r = row(t.get("tag") or "untagged")
+        r["text"] = r["text"] or t.get("note", "")
+        r["received_at"] = r["received_at"] or t.get("received_at")
+        r["received_wall"] = r["received_wall"] or t.get("received_wall")
+    for entry in load_twist_file(path):
+        r = row(entry.get("tag") or "untagged")
+        r["text"] = entry.get("text") or r["text"]
+        r["received_wall"] = entry.get("received_at") or r["received_wall"]
+        r["merged_at"] = entry.get("merged_at") or r["merged_at"]
+        for item in entry.get("added") or []:
+            r["added"].append({"kind": "file", "id": None, "name": "", "file": item, "created_at": entry.get("merged_at")})
+    for rule in rules:
+        if not rule.twist_tag:
+            continue
+        r = row(rule.twist_tag)
+        r["added"] = [a for a in r["added"] if a["file"] != rule.file]
+        r["added"].append(
+            {"kind": "rule", "id": rule.id, "name": rule.name, "file": rule.file, "created_at": rule.created_at}
+        )
+        r["merged_at"] = r["merged_at"] or rule.created_at
+    for r in rows.values():
+        r["status"] = "merged" if r["added"] else "received"
+    return sorted(rows.values(), key=lambda r: r["received_at"] or r["received_wall"] or r["merged_at"] or "", reverse=True)
 
 
 def decision_line(

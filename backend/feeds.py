@@ -118,6 +118,42 @@ class ReeferModel:
         return since
 
 
+WARMUP_NOTES = {
+    "frozen": "CSIRO 2007. Frozen cargo takes about 19 hours to warm from minus 18 C to minus 10 C with the power off.",
+    "chilled": "Assumption. Chilled cargo warms with a 6 hour time constant. This is not a CSIRO figure.",
+    "produce": "Assumption. Produce warms with a 6 hour time constant. This is not a CSIRO figure.",
+}
+
+
+def loss_limit_c(set_point_c: float) -> float:
+    """Product temperature at which the load counts as lost: 8 C over for frozen, 4 C over otherwise."""
+    return set_point_c + (8.0 if cargo_kind(set_point_c) == "frozen" else 4.0)
+
+
+def warmup(model: ReeferModel, now: datetime) -> dict:
+    """Warm up clock in scenario hours, projected from the power loss on the model curve."""
+    kind = model.kind
+    limit = loss_limit_c(model.set_point_c)
+    since = model.power_off_since(now)
+    out = {"kind": kind, "limit_c": limit, "note": WARMUP_NOTES[kind], "power_on": since is None}
+    if since is None:
+        return {**out, "off_since": None, "hours_off": 0.0, "limit_at": None, "hours_left": None}
+    _, product0, _ = model.state_at(since)
+    tau = product_tau_h(kind)
+    if product0 >= limit:
+        reach_h = 0.0
+    else:
+        reach_h = tau * math.log((AMBIENT_C - product0) / (AMBIENT_C - limit))
+    limit_at = since + timedelta(hours=reach_h)
+    return {
+        **out,
+        "off_since": iso(since),
+        "hours_off": round((now - since).total_seconds() / 3600, 2),
+        "limit_at": iso(limit_at.replace(microsecond=0)),
+        "hours_left": round(max(0.0, (limit_at - now).total_seconds() / 3600), 2),
+    }
+
+
 def _evolve(air: float, product: float, power: bool, dt_h: float, model: ReeferModel) -> tuple[float, float]:
     tau_p = product_tau_h(model.kind)
     if power:

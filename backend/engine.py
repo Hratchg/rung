@@ -273,7 +273,9 @@ def _owner(ctx: Ctx, fired: list[Rule], step: str) -> str | None:
     return None
 
 
-def _reason(ctx: Ctx, fired: list[Rule], step: str, hand: bool, pinned: bool, owner: str | None) -> str:
+def _reason(
+    ctx: Ctx, fired: list[Rule], whys: dict[str, str], step: str, hand: bool, pinned: bool, owner: str | None
+) -> str:
     parts: list[str] = []
     told: set[int] = set()
 
@@ -287,7 +289,7 @@ def _reason(ctx: Ctx, fired: list[Rule], step: str, hand: bool, pinned: bool, ow
         parts.append(f"{FALLBACK_SENTENCE} Urgency {ctx.urgency}.")
     for rule in fired:
         tell_conflicts(rule.uses)
-        parts.append(rule.why(ctx))
+        parts.append(whys[rule.id])
     tell_conflicts({c.code for c in ctx.conflicts})
     parts.append("Release first at its slot." if pinned else STEP_SENTENCE[step])
     if hand and step != "HAND":
@@ -316,6 +318,7 @@ def evaluate(box: Box, now: datetime, rules: list[Rule] | None = None) -> Decisi
     )
     pinned = step == "RELEASE" and any(rule.pin for rule in fired)
     owner = _owner(ctx, fired, step)
+    whys = {rule.id: rule.why(ctx) for rule in fired}
     return Decision(
         box=box.number,
         step=step,
@@ -324,10 +327,11 @@ def evaluate(box: Box, now: datetime, rules: list[Rule] | None = None) -> Decisi
         fired=[rule.id for rule in fired],
         conflicts=ctx.conflicts,
         trust={name: t.value for name, t in trust.items()},
-        reason=_reason(ctx, fired, step, hand, pinned, owner),
+        reason=_reason(ctx, fired, whys, step, hand, pinned, owner),
         owner=owner,
         pinned=pinned,
         votes={rule.id: s for rule, s in zip(fired, steps)},
+        whys=whys,
         trust_detail=trust,
         readings=readings,
         twist_tag=next((rule.twist_tag for rule in fired if rule.twist_tag), None),

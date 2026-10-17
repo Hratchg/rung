@@ -1,8 +1,32 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useAppState, useScenarioControls, type ScenarioEvent, type State } from './api'
+import { AuditPanel, TwistPanel } from './Audit'
+import BoxCard from './BoxCard'
 import Queue from './Queue'
 import { laneList } from './format'
 import { BadgeChip } from './ui'
+
+type Route = { name: 'queue' } | { name: 'box'; number: string }
+type Panel = { kind: 'audit'; box: string } | { kind: 'twist' } | null
+
+function parseHash(hash: string): Route {
+  const box = hash.match(/^#\/box\/([A-Za-z0-9]+)/)
+  if (box) return { name: 'box', number: box[1].toUpperCase() }
+  return { name: 'queue' }
+}
+
+function useRoute(): Route {
+  const [route, setRoute] = useState(() => parseHash(window.location.hash))
+  useEffect(() => {
+    const onChange = () => {
+      setRoute(parseHash(window.location.hash))
+      window.scrollTo(0, 0)
+    }
+    window.addEventListener('hashchange', onChange)
+    return () => window.removeEventListener('hashchange', onChange)
+  }, [])
+  return route
+}
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const SPEEDS = [0, 1, 2, 5, 10]
@@ -28,11 +52,21 @@ function Counter({ label, value, detail }: { label: string; value: string; detai
   )
 }
 
+const POLLER_SHORT: Record<string, string> = {
+  starting: 'Terminal49 starting',
+  no_key: 'No Terminal49 key. Fixture data',
+  unauthorized: 'Terminal49 refused the key. Fixture data',
+  error: 'Terminal49 unreachable. Fixture data',
+}
+
 function PollerChip({ poller }: { poller: State['poller'] }) {
   const ok = poller.status === 'ok'
   return (
-    <span className={`rounded-md px-2 py-1 text-base font-semibold ${ok ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-950'}`}>
-      {ok ? `Terminal49 live. ${poller.live_count} boxes` : poller.message}
+    <span
+      title={poller.message}
+      className={`rounded-md px-2 py-1 text-base font-semibold ${ok ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-950'}`}
+    >
+      {ok ? `Terminal49 live. ${poller.live_count} boxes` : POLLER_SHORT[poller.status] ?? poller.message}
     </span>
   )
 }
@@ -128,7 +162,26 @@ function Controls({ state }: { state: State }) {
   )
 }
 
-function Header({ state }: { state: State }) {
+function Nav({ route, panel, onPanel }: { route: Route; panel: Panel; onPanel: (p: Panel) => void }) {
+  const tab = (active: boolean) =>
+    `rounded-md px-3 py-1 font-semibold ${active ? 'bg-current/15 ring-2 ring-current/60' : 'border border-current/40 hover:bg-white/10'}`
+  const auditBox = route.name === 'box' ? route.number : ''
+  return (
+    <nav className="flex flex-wrap items-center gap-2" aria-label="Screens">
+      <a href="#/" className={tab(route.name === 'queue')} aria-current={route.name === 'queue' ? 'page' : undefined}>
+        Queue
+      </a>
+      <button type="button" className={tab(panel?.kind === 'audit')} onClick={() => onPanel(panel?.kind === 'audit' ? null : { kind: 'audit', box: auditBox })}>
+        Audit log
+      </button>
+      <button type="button" className={tab(panel?.kind === 'twist')} onClick={() => onPanel(panel?.kind === 'twist' ? null : { kind: 'twist' })}>
+        Twist log
+      </button>
+    </nav>
+  )
+}
+
+function Header({ state, route, panel, onPanel }: { state: State; route: Route; panel: Panel; onPanel: (p: Panel) => void }) {
   const { time, date } = clockParts(state.clock)
   const harbor = state.mode === 'harbor_night'
   const closed = Array.from({ length: state.lanes }, (_, i) => i + 1).filter((l) => !state.lanes_open.includes(l))
@@ -151,13 +204,9 @@ function Header({ state }: { state: State }) {
           Lanes open <strong>{state.lanes_open.length}</strong> of {state.lanes}
           {closed.length > 0 && <span className="ml-2 font-semibold text-amber-500">Closed {laneList(closed)}</span>}
         </div>
-        {state.dark_sources.length > 0 && (
-          <span className="rounded-md bg-red-600 px-2 py-1 font-semibold text-white">Dark feed: {state.dark_sources.join(' and ')}</span>
-        )}
-        <span className="flex items-center gap-2" title={`${state.legend.live}. ${state.legend.simulated}.`}>
-          <BadgeChip kind="live" />
-          <BadgeChip kind="simulated" />
-        </span>
+        <div className="ml-auto">
+          <Nav route={route} panel={panel} onPanel={onPanel} />
+        </div>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <Counter label="Released" value={String(c.released)} />
@@ -165,9 +214,16 @@ function Header({ state }: { state: State }) {
         <Counter label="Demurrage avoided" value={`${c.demurrage_avoided_usd.toLocaleString('en-US')} USD`} />
         <Counter label="Throughput" value={`${c.throughput_pct}%`} />
         <PollerChip poller={state.poller} />
+        <span className="flex items-center gap-2" title={`${state.legend.live}. ${state.legend.simulated}.`}>
+          <BadgeChip kind="live" />
+          <BadgeChip kind="simulated" />
+        </span>
       </div>
-      <div className="mt-2">
+      <div className="mt-2 flex flex-wrap items-center gap-2">
         <Controls state={state} />
+        {state.dark_sources.length > 0 && (
+          <span className="ml-auto rounded-md bg-red-600 px-2 py-1 font-semibold text-white">Dark feed: {state.dark_sources.join(' and ')}</span>
+        )}
       </div>
     </header>
   )
@@ -175,6 +231,9 @@ function Header({ state }: { state: State }) {
 
 export default function App() {
   const state = useAppState()
+  const route = useRoute()
+  const [panel, setPanel] = useState<Panel>(null)
+  const closePanel = useCallback(() => setPanel(null), [])
   if (!state.data) {
     return (
       <p className="p-6 text-lg">{state.isError ? 'Cannot reach the Rung server. Retrying every 2 seconds.' : 'Loading Pier 7'}</p>
@@ -182,11 +241,17 @@ export default function App() {
   }
   return (
     <div className="min-h-screen">
-      <Header state={state.data} />
+      <Header state={state.data} route={route} panel={panel} onPanel={setPanel} />
       {state.isError && (
         <p className="bg-red-100 px-4 py-2 text-red-900">Lost contact with the Rung server. Showing the last update.</p>
       )}
-      <Queue carriers={state.data.carriers} />
+      {route.name === 'box' ? (
+        <BoxCard key={route.number} number={route.number} onAudit={(box) => setPanel({ kind: 'audit', box })} />
+      ) : (
+        <Queue carriers={state.data.carriers} />
+      )}
+      {panel?.kind === 'audit' && <AuditPanel key={panel.box} initialBox={panel.box} onClose={closePanel} />}
+      {panel?.kind === 'twist' && <TwistPanel onClose={closePanel} />}
     </div>
   )
 }

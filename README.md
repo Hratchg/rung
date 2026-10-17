@@ -6,7 +6,17 @@ conflicts between sources, and recommends the gentlest step on a ladder:
 RELEASE, WATCH, ASK, SLOW, HOLD, and HAND. The planner approves or overrides every hold or release,
 and every decision is written to an audit log.
 
-Status: Phase 1 (Can't Wait) is built. The box card, gate optimizer, and voice calls come in later phases.
+Status: Phase 2 (Rung) is built: the queue, the box card, and the audit and twist panels. The gate
+optimizer and voice calls come in later phases.
+
+## Screens
+
+| Screen | How to get there | What it shows |
+| --- | --- | --- |
+| Queue | `#/`, the Queue tab | Every waiting box grouped by step, with Approve and Override per row |
+| Box card | Click a box number, or open `#/box/MSKU1234567` | Five source panels with trust bars (hover for the trust reason), conflicts with both values, fired rules with their step, the reason, decision history, and on Harbor Night the reefer warm up clock |
+| Audit log panel | Audit log tab, or Open in audit log on a box card | Audit lines newest first, filter by box |
+| Twist log panel | Twist log tab | Each twist tag, when it was received, what was added, and when it merged |
 
 ## Setup
 

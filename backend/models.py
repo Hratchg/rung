@@ -154,6 +154,8 @@ class Rule:
     owner: Callable[[Ctx], str | None] | None = None
     twist_tag: str | None = None
     created_at: str = ""
+    name: str = ""
+    file: str = ""
 
     def step_for(self, ctx: Ctx) -> str:
         return self.step(ctx) if callable(self.step) else self.step
@@ -177,6 +179,7 @@ class Decision:
     owner: str | None
     pinned: bool = False
     votes: dict[str, str] = field(default_factory=dict)
+    whys: dict[str, str] = field(default_factory=dict)
     trust_detail: dict[str, Trust] = field(default_factory=dict)
     readings: list[Reading] = field(default_factory=list)
     twist_tag: str | None = None

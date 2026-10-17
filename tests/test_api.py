@@ -225,3 +225,71 @@ def test_poller_success_marks_boxes_live_and_writes_fixture(tmp_path, client):
     finally:
         scenario.live_payload = None
         scenario.reset()
+
+
+# Phase 2: box card, audit panel, twist panel.
+
+
+def test_box_card_shows_five_panels_c3_and_reason_for_harbor_night_box(client):
+    client.post("/api/scenario/jump", json={"t": "+00:25"})
+    b = client.get("/api/box/MSKU1234567").json()
+    assert [name for name, s in b["sources"].items() if s] == ["carrier", "terminal", "customs", "weighbridge", "reefer"]
+    for s in b["sources"].values():
+        assert {"fields", "age", "trust", "trust_reason", "badge", "dark"} <= set(s)
+        assert 0 <= s["trust"] <= 1 and s["badge"] == "simulated" and s["trust_reason"].endswith(f"trust {s['trust']:.2f}")
+    c3 = next(c for c in b["conflicts"] if c["code"] == "C3")
+    assert c3["sources"] == ["reefer"] and set(c3["values"]) == {"power_on", "product_temp_c", "set_point_c"}
+    assert c3["sentence"].startswith("Reefer power off")
+    fired = {f["id"]: f for f in b["fired"]}
+    assert fired["R6"]["step"] == "HOLD" and fired["R6"]["name"] == "reefer under hold" and fired["R6"]["why"]
+    assert fired["R7"]["file"] == "backend/rules/r07_hold_owner.py"
+    assert b["decision"]["step"] == "HOLD" and "Escalated to planner with reefer evidence." in b["decision"]["reason"]
+    assert b["mode"] == "harbor_night" and b["warmup"]["off_since"] == "2026-10-18T21:00:00-07:00"
+    assert b["warmup"]["note"].startswith("Assumption.")
+    assert b["history"] and b["history"][0]["box"] == "MSKU1234567"
+
+
+def test_override_from_card_lands_in_history_with_override_true(client):
+    client.post("/api/scenario/jump", json={"t": "+00:25"})
+    res = client.post("/api/decision", json={"box": "MSKU1234567", "action": "override", "step": "WATCH", "note": "Broker is on it"})
+    assert res.status_code == 200
+    card = client.get("/api/box/MSKU1234567").json()
+    top = card["history"][0]
+    assert top["actor"] == "planner" and top["override"] is True and top["step"] == "WATCH" and top["note"] == "Broker is on it"
+    assert top["previous_step"] == "HOLD"
+    assert card["decision"]["step"] == "WATCH" and card["decision"]["engine_step"] == "HOLD"
+    audit = client.get("/api/audit", params={"limit": 1}).json()
+    assert audit["lines"][0]["seq"] == top["seq"] and audit["lines"][0]["override"] is True
+
+
+def test_audit_newest_first_with_limit_and_box_filter(client):
+    data = client.get("/api/audit", params={"limit": 5}).json()
+    assert len(data["lines"]) == 5 and data["total"] == 191
+    seqs = [x["seq"] for x in data["lines"]]
+    assert seqs == sorted(seqs, reverse=True)
+    lines = client.get("/api/audit", params={"box": "msku1234"}).json()["lines"]
+    assert lines and all("MSKU1234" in x["box"] for x in lines)
+
+
+def test_twist_panel_lists_the_scripted_twist(client):
+    assert client.get("/api/audit").json()["twists"] == []
+    client.post("/api/scenario/jump", json={"t": "+01:00"})
+    twists = client.get("/api/audit").json()["twists"]
+    assert [t["tag"] for t in twists] == ["twist-1"]
+    t = twists[0]
+    assert t["received_at"] == "2026-10-18T23:00:00-07:00" and t["status"] == "received" and t["added"] == []
+
+
+def test_twist_log_joins_twist_file_and_tagged_rule_files(tmp_path):
+    from backend.audit import twist_log
+    from backend.models import Rule
+
+    log = tmp_path / "twists.json"
+    log.write_text(json.dumps([{"tag": "twist-2", "text": "Chassis shortage", "received_at": "2026-10-17T15:00:00+00:00", "merged_at": "2026-10-17T15:20:00+00:00", "added": ["backend/rules/r12_chassis.py"]}]))
+    rule = Rule(id="R12", step="SLOW", test=lambda c: False, why=lambda c: "", twist_tag="twist-2", created_at="2026-10-17T15:18:00+00:00", name="chassis", file="backend/rules/r12_chassis.py")
+    scripted = [{"tag": "twist-1", "note": "paste the twist text here", "received_at": "2026-10-18T23:00:00-07:00"}]
+    rows = {r["tag"]: r for r in twist_log(scripted, [rule], log)}
+    assert rows["twist-1"]["status"] == "received"
+    merged = rows["twist-2"]
+    assert merged["status"] == "merged" and merged["merged_at"] == "2026-10-17T15:20:00+00:00"
+    assert merged["added"] == [{"kind": "rule", "id": "R12", "name": "chassis", "file": "backend/rules/r12_chassis.py", "created_at": "2026-10-17T15:18:00+00:00"}]

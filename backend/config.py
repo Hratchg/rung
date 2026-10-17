@@ -28,4 +28,5 @@ SCENARIO_PATH = ROOT / env("SCENARIO_PATH", "scenario.json")
 MINUTES_PER_SECOND = float(env("MINUTES_PER_SECOND", "1"))
 AUDIT_PATH = ROOT / env("AUDIT_PATH", "audit.jsonl")
 FIXTURE_PATH = ROOT / "fixtures" / "t49_snapshot.json"
+TWIST_LOG_PATH = ROOT / "twists.json"
 FRONTEND_DIST = ROOT / "frontend" / "dist"

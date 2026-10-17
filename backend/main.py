@@ -7,7 +7,9 @@ from contextlib import asynccontextmanager
 from fastapi import Body, FastAPI, HTTPException
 
 from . import config
-from .audit import Audit
+from .audit import Audit, twist_log
+from .engine import RULES
+from .feeds import warmup
 from .models import SOURCE_SPECS, SOURCES, STRENGTH, DecisionIn, JumpIn, SpeedIn
 from .scenario import EVENT_TYPES, BoxState, Scenario
 from .t49 import Poller
@@ -202,17 +204,32 @@ def get_box(number: str) -> dict:
                 "badge": badge(state, name),
                 "dark": name in scenario.dark_sources or age_h is None or age_h > spec.dark_after_h,
             }
+        rules = {r.id: r for r in RULES}
         return {
             "number": state.number,
             "live": state.live,
+            "equipment_type": state.equipment_type,
+            "equipment_length": (state.carrier or {}).get("equipment_length"),
             "appointment": state.appointment,
+            "mode": scenario.mode,
             "sources": sources,
             "conflicts": [
                 {"code": c.code, "sources": c.sources, "values": c.values, "sentence": c.sentence} for c in d.conflicts
             ],
-            "fired": [{"id": rid, "step": d.votes.get(rid)} for rid in d.fired],
+            "fired": [
+                {
+                    "id": rid,
+                    "name": rules[rid].name if rid in rules else "",
+                    "step": d.votes.get(rid),
+                    "why": d.whys.get(rid, ""),
+                    "file": rules[rid].file if rid in rules else "",
+                    "twist_tag": rules[rid].twist_tag if rid in rules else None,
+                }
+                for rid in d.fired
+            ],
             "decision": scenario.effective(state),
             "clocks": clocks(state),
+            "warmup": warmup(state.reefer_model, scenario.now) if state.reefer_model else None,
             "history": scenario.audit.lines(box=number),
             "call": None,
         }
@@ -229,8 +246,15 @@ def post_decision(body: DecisionIn) -> dict:
 
 
 @app.get("/api/audit")
-def get_audit(since: str = "", box: str = "") -> dict:
-    return {"lines": scenario.audit.lines(since or None, box or None), "twists": list(scenario.twists)[::-1]}
+def get_audit(since: str = "", box: str = "", limit: int = 0) -> dict:
+    with scenario.lock:
+        scenario.advance()
+        twists = twist_log(scenario.twists, RULES, config.TWIST_LOG_PATH)
+    return {
+        "lines": scenario.audit.lines(since or None, box.strip().upper() or None, max(0, limit)),
+        "total": len(scenario.audit.buffer),
+        "twists": twists,
+    }
 
 
 @app.post("/api/scenario/reset")
