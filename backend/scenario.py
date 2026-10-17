@@ -18,6 +18,7 @@ from stdnum import iso6346
 
 from . import config
 from .audit import Audit, decision_line
+from .emissions import IDLE_LIMIT_H, Idle, blunt_idle, co2_kg, truck_idle
 from .engine import evaluate
 from .feeds import ReeferModel, circuit_for, loss_limit_c, reefer_model, weighbridge_reading
 from .gate import Appt, Assignment, solve
@@ -85,6 +86,9 @@ SILENT_ASK_EFFECT = {
     "failed": "Reefer technician asked to inspect the unit.",
     "telemetry": "Reefer crew asked for a manual temperature read.",
 }
+WINDOW = timedelta(hours=1)
+# Steps that keep a truck at the gate while it waits for an answer. On a dark feed the answer may not come.
+WAITING_STEPS = ("WATCH", "ASK", "HAND")
 
 
 def load_config(path: Path) -> dict:
@@ -298,6 +302,10 @@ class BoxState:
     call: dict | None = None
     # Source name to the scenario time a judge last spoofed it.
     spoofed: dict[str, str] = field(default_factory=dict)
+    # The (lane, window) first booked. Approving SLOW moves the appointment, but the truck still came at this window.
+    booked: tuple[int, str] | None = None
+    # The truck's idle, frozen once it gates out or its window ends.
+    idle_final: Idle | None = None
 
     def reefer_reading(self, now: datetime) -> dict | None:
         return self.reefer_model.reading(now) if self.reefer_model else None
@@ -365,6 +373,7 @@ class Scenario:
             self.rated_latest_window = self._latest_window(self.rated_deadline)
             self.clock = Clock(self.start, self.speed)
             self.now = self.start
+            self.idle_settled_to = self.start
             self.resets += 1
             if self.live_payload:
                 self._overlay(*self.live_payload)
@@ -392,6 +401,7 @@ class Scenario:
             reefer_model=reefer_model(c["number"], self.seed, reefer, parse_dt, circuit) if reefer else None,
             appointment=appt,
             weight_case=c.get("weight_case"),
+            booked=(int(appt["lane"]), appt["window"]) if appt else None,
         )
 
     def _latest_window(self, deadline: datetime | None) -> str | None:
@@ -446,10 +456,45 @@ class Scenario:
     def _advance_to(self, t: datetime) -> None:
         while self.next_event < len(self.events) and self.events[self.next_event][0] <= t:
             at, _, event = self.events[self.next_event]
+            self._settle_idle(at)
             self.next_event += 1
             self.apply_event(event, at, scripted=True)
+        self._settle_idle(t)
         self.now = t
         self.after_advance()
+
+    def _settle_idle(self, upto: datetime) -> None:
+        """Freeze the idle of trucks whose window ends by upto, from the plan Rung would make in that window's last second.
+
+        A jump can pass a window end with no request in between, so the decisions are worked out fresh with
+        evaluate(), which is pure. Nothing on the boxes changes except idle_final.
+        """
+        for w in self.windows:
+            end = window_at(w, self.start) + WINDOW
+            if not self.idle_settled_to < end <= upto:
+                continue
+            due = [
+                s
+                for s in self.boxes.values()
+                if s.appointment and s.appointment["window"] == w and s.released_at is None and s.idle_final is None
+            ]
+            if not due:
+                continue
+            at = end - timedelta(seconds=1)
+            saved, self.now = self.now, at
+            try:
+                windows = set(self.open_windows())
+                fresh = {
+                    s.number: evaluate(self.box_view(s, at), at)
+                    for s in self.boxes.values()
+                    if s.released_at is None and s.appointment and s.appointment["window"] in windows
+                }
+                _, plan = self.gate_plan(fresh)
+                for s in due:
+                    s.idle_final = self.idle(s, plan, fresh.get(s.number)).settle()
+            finally:
+                self.now = saved
+        self.idle_settled_to = max(self.idle_settled_to, upto)
 
     def after_advance(self) -> None:
         for state in self.boxes.values():
@@ -479,8 +524,8 @@ class Scenario:
         hours = hours_between(parse_dt(state.appointment["at"]), self.now)
         return -1 < hours <= 2
 
-    def effective(self, state: BoxState) -> dict:
-        d = state.decision
+    def effective(self, state: BoxState, decision: Decision | None = None) -> dict:
+        d = decision or state.decision
         step, hand, reason, owner = d.step, d.hand, d.reason, d.owner
         planner = state.planner
         if planner and planner["action"] == "override":
@@ -555,6 +600,9 @@ class Scenario:
 
     def _act(self, state: BoxState, step: str, d: Decision) -> str:
         if step == "RELEASE":
+            idle = self.idle(state)
+            if idle is not None:
+                state.idle_final = idle.settle(idle.so_far(self.now))
             state.released_at = self.now
             state.pending_release = False
             state.demurrage_avoided = self._demurrage_avoided(state)
@@ -825,13 +873,14 @@ class Scenario:
         lfd = parse_date((state.terminal or {}).get("pickup_lfd"))
         return lfd is not None and lfd <= self.now.date()
 
-    def gate_rows(self) -> list[Appt]:
+    def gate_rows(self, decisions: dict[str, Decision] | None = None) -> list[Appt]:
         windows = set(self.open_windows())
         rows = []
         for s in self.boxes.values():
-            if s.released_at or not s.appointment or not s.decision or s.appointment["window"] not in windows:
+            d = (decisions or {}).get(s.number) or s.decision
+            if s.released_at or not s.appointment or not d or s.appointment["window"] not in windows:
                 continue
-            eff = self.effective(s)
+            eff = self.effective(s, d)
             rated = self.is_rated(s)
             rows.append(
                 Appt(
@@ -863,8 +912,8 @@ class Scenario:
             s.number for s in self.boxes.values() if s.appointment and not s.released_at and s.appointment["window"] not in windows
         )
 
-    def gate_plan(self) -> tuple[list[Appt], Assignment]:
-        rows = self.gate_rows()
+    def gate_plan(self, decisions: dict[str, Decision] | None = None) -> tuple[list[Appt], Assignment]:
+        rows = self.gate_rows(decisions)
         windows = self.open_windows()
         lanes = self.lanes_open()
         sig = (tuple(lanes), tuple(windows), tuple(sorted(rows, key=lambda a: a.box)))
@@ -891,6 +940,41 @@ class Scenario:
     def _past_limit(self, reading: dict) -> bool:
         return reading["product_temp_c"] >= loss_limit_c(reading["set_point_c"])
 
+    def idle(self, state: BoxState, plan: Assignment | None = None, decision: Decision | None = None) -> Idle | None:
+        """The truck's idle tonight under the gate plan. None when no truck is booked for the box."""
+        if state.booked is None:
+            return None
+        if state.idle_final is not None:
+            return state.idle_final
+        arrive = window_at(state.booked[1], self.start)
+        if plan is None:
+            _, plan = self.gate_plan()
+        number = state.number
+        slot = plan.placed.get(number)
+        held = number in plan.held
+        if slot is None and not held and number not in plan.overflow:
+            return Idle(arrive, 0.0, "kept", settled=True)
+        d = decision or state.decision
+        slot_at = window_at(slot[1], self.start) if slot else None
+        dark_since = None
+        if slot and "R10" in d.fired and self.effective(state, d)["step"] in WAITING_STEPS:
+            depends = {"terminal", "customs"} | ({"reefer"} if state.equipment_type == "reefer" else set())
+            since = [at for source, at in self.dark_sources.items() if source in depends]
+            dark_since = min(since) if since else slot_at
+        hours, cause = truck_idle(arrive, slot_at, held, dark_since, self.now)
+        return Idle(arrive, hours, cause, slot)
+
+    def idle_so_far(self, plan: Assignment | None = None) -> float:
+        if plan is None:
+            _, plan = self.gate_plan()
+        return sum(idle.so_far(self.now) for s in self.boxes.values() if (idle := self.idle(s, plan)) is not None)
+
+    def idle_planned(self) -> tuple[float, float]:
+        """Whole idle hours for the trucks in tonight's plan: Rung's plan, then closing the terminal."""
+        rows, plan = self.gate_plan()
+        rung = sum((self.idle(self.boxes[a.box], plan).hours for a in rows), 0.0)
+        return rung, len(rows) * IDLE_LIMIT_H
+
     def counters(self) -> dict:
         released = [s for s in self.boxes.values() if s.released_at]
         powered = lost = 0
@@ -907,6 +991,7 @@ class Scenario:
             lost += self._past_limit(reading)
         rows, plan = self.gate_plan()
         kept = [a for a in rows if a.box in plan.placed and a.step != "HOLD"]
+        idle_h = self.idle_so_far(plan)
         return {
             "released": len(released),
             "released_blunt": 0,
@@ -914,17 +999,31 @@ class Scenario:
             "reefers_lost": lost,
             "demurrage_avoided_usd": round(sum(s.demurrage_avoided for s in released)),
             "throughput_pct": round(100 * len(kept) / len(rows)) if rows else 0,
+            "idle_hours": round(idle_h, 1),
+            "idle_co2_kg": round(co2_kg(idle_h)),
         }
 
     def counters_blunt(self) -> dict:
-        """The blunt move: close the terminal. Nothing gates out, so every reefer stays in the yard."""
+        """The blunt move: close the terminal. Nothing gates out, so every reefer stays in the yard.
+
+        Nobody re-plans the trucks either, so every booked truck still comes and waits out its hour.
+        """
         powered = lost = 0
         for s in self.boxes.values():
             if s.reefer_model:
                 reading = s.reefer_reading(self.now)
                 powered += bool(reading["power_on"])
                 lost += self._past_limit(reading)
-        return {"released": 0, "reefers_powered": powered, "reefers_lost": lost, "demurrage_avoided_usd": 0, "throughput_pct": 0}
+        idle_h = blunt_idle([window_at(s.booked[1], self.start) for s in self.boxes.values() if s.booked], self.now)
+        return {
+            "released": 0,
+            "reefers_powered": powered,
+            "reefers_lost": lost,
+            "demurrage_avoided_usd": 0,
+            "throughput_pct": 0,
+            "idle_hours": round(idle_h, 1),
+            "idle_co2_kg": round(co2_kg(idle_h)),
+        }
 
     def apply_live(self, payload: dict, live: bool) -> int:
         with self.lock:
