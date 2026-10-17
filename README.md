@@ -23,6 +23,7 @@ customs hold lands, a reefer of chilled beef that already sits under a customs h
 terminal feed goes dark. Rung keeps the gate open: it re-slots every truck in under a millisecond and
 hands the planner only the boxes that need a person.
 
+- [UI guide](docs/ui-guide.md): a 60 second tour, every screen with annotated screenshots, a plain language glossary of every term on screen, and common questions. Start here if you have no port or logistics background.
 - [How Rung works](docs/how-it-works.md): architecture, trust, conflicts, urgency, the rules, the optimizer, the voice call, and what is live versus simulated.
 - [Demo pitch](docs/demo-pitch.md): a pitch that fits in 2:50 with the live voice call, a click by click run of show, a 30 second version, and a judges Q&A sheet.
 
@@ -121,7 +122,7 @@ planner's app: **Reset**, **Minutes per second** (Pause stops the clock), the ne
 **More controls** with Close lanes 4 to 6, Customs hold on TCLU7654321, Cut terminal feed, the reefer
 faults, and rated orders. The scripted Harbor Night events fire on their own as the clock passes them.
 See [How Rung works](docs/how-it-works.md#the-scenario) for the timeline and the matching API calls,
-and [Reading the screen](docs/how-it-works.md#reading-the-screen) for a tour of the layout.
+and the [UI guide](docs/ui-guide.md) for an annotated tour of every screen and a glossary of every term.
 
 ## Layout
 
