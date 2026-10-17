@@ -162,23 +162,23 @@ function Identity({ box }: { box: BoxDetail }) {
   const appt = box.clocks.appointment
   const cargo = box.sources.reefer?.fields.cargo
   return (
-    <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
       <BackLink />
       <h2 className="font-mono text-3xl font-bold">{box.number}</h2>
-      <span className="text-lg">
+      <span>
         {box.equipment_type}
         {box.equipment_length ? ` ${box.equipment_length} ft` : ''}
         {typeof cargo === 'string' ? `, ${cargo}` : ''}
       </span>
       {box.appointment ? (
-        <span className={`text-lg ${appt?.lane_closed ? 'font-semibold text-amber-800' : ''}`}>
+        <span className={`${appt?.lane_closed ? 'font-semibold text-amber-800' : ''}`}>
           {box.appointment.dray_carrier}. Slot {appt?.window} lane {appt?.lane}
           {appt?.lane_closed ? ', lane closed' : ''}
         </span>
       ) : (
-        <span className="text-lg text-slate-600">No appointment</span>
+        <span className="text-slate-600">No appointment</span>
       )}
-      {box.clocks.lfd && <span className={`text-lg ${box.clocks.lfd.hours <= 24 ? 'font-semibold text-red-800' : ''}`}>{plainLfd(box.clocks.lfd.label)}</span>}
+      {box.clocks.lfd && <span className={`${box.clocks.lfd.hours <= 24 ? 'font-semibold text-red-800' : ''}`}>{plainLfd(box.clocks.lfd.label)}</span>}
       {box.rated && <span className="rounded bg-amber-300 px-2 py-0.5 text-lg font-semibold text-indigo-950">{box.rated.label}</span>}
       <SourceBadges badges={badges} />
     </div>

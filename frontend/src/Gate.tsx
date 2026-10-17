@@ -67,7 +67,7 @@ function Hero({ gate }: { gate: Gate }) {
   const small: [string, string, string][] = [
     ['Bookings kept', `${rung.throughput_pct}%`, `${blunt.throughput_pct}%`],
     ['Released so far', String(rung.released), String(blunt.released)],
-    ['Reefers past safe temperature', String(rung.reefers_lost), String(blunt.reefers_lost)],
+    ['Reefers lost', String(rung.reefers_lost), String(blunt.reefers_lost)],
   ]
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" aria-label="Rung against closing the terminal">

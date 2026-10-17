@@ -30,7 +30,7 @@ export function Drawer({
 }) {
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent side="right" className={`w-full gap-0 bg-white ${wide ? 'sm:max-w-[920px]' : 'sm:max-w-[680px]'}`}>
+      <SheetContent side="right" className={`w-full gap-0 bg-white ${wide ? 'data-[side=right]:sm:max-w-[960px]' : 'data-[side=right]:sm:max-w-[680px]'}`}>
         <SheetHeader className="border-b border-slate-200 pr-14">
           <SheetTitle>{title}</SheetTitle>
           <SheetDescription>{description}</SheetDescription>

@@ -177,15 +177,15 @@ export default function DemoDock({ state, onTwist, onPrompt }: { state: State; o
           <RotateCcw aria-hidden />
           Reset
         </Button>
-        <div className="flex items-center gap-1" role="group" aria-label="Speed">
-          <span className="mr-1 text-zinc-300">Speed</span>
+        <div className="flex items-center gap-1" role="group" aria-label="Speed in scenario minutes per second">
+          <span className="mr-1 text-zinc-300">Minutes per second</span>
           {SPEEDS.map((s) => (
             <Button key={s} variant="demo" size="sm" className="px-2.5" aria-pressed={state.minutes_per_second === s} onClick={() => speed.mutate(s)}>
-              {s === 0 ? 'Paused' : `${s} min/s`}
+              {s === 0 ? 'Pause' : s}
             </Button>
           ))}
         </div>
-        <span className="min-w-0 truncate text-zinc-300">
+        <span className="min-w-0 flex-1 basis-0 truncate text-zinc-300">
           {next ? (
             <>
               Next <span className="font-mono">{next.t}</span> {describeEvent(next)}
@@ -196,7 +196,7 @@ export default function DemoDock({ state, onTwist, onPrompt }: { state: State; o
         </span>
         {error && <span className="rounded bg-red-100 px-2 text-red-900">{error.message}</span>}
         {note && <span className="rounded bg-amber-100 px-2 text-amber-950">{note}</span>}
-        <Button variant="demo" size="sm" className="ml-auto" onClick={onPrompt}>
+        <Button variant="demo" size="sm" onClick={onPrompt}>
           <FileText aria-hidden />
           Voice agent prompt
         </Button>

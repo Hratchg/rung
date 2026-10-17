@@ -117,6 +117,7 @@ export default function AskCall({ box, embedded = false, onPrompt }: { box: BoxD
             <span className="font-semibold text-fuchsia-900">Demo</span>
             <span className="text-slate-700">The simulated trucker answers</span>
             <select
+              aria-label="Simulated trucker answer"
               className="h-9 rounded-lg border border-slate-300 bg-white px-2"
               value={answer}
               onChange={(e) => setAnswer(e.target.value as CallOutcome)}

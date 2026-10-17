@@ -90,13 +90,11 @@ function Tab({ href, active, onClick, children }: { href?: string; active: boole
   )
 }
 
-function AlertStrip({ state }: { state: State }) {
+function StatusStrip({ state }: { state: State }) {
   const latest = state.event_log[0]
-  const dark = state.dark_feed
-  if (!latest && dark.length === 0) return null
   return (
     <div className="flex flex-col">
-      {dark.map((line) => (
+      {state.dark_feed.map((line) => (
         <p key={`${line.cause}-${line.source}`} role="status" className="flex flex-wrap items-center gap-x-3 bg-red-700 px-4 py-1.5 text-white">
           <WifiOff className="size-5" aria-hidden />
           <strong className="text-lg">{line.text}</strong>
@@ -107,13 +105,14 @@ function AlertStrip({ state }: { state: State }) {
           </span>
         </p>
       ))}
-      {latest && (
-        <p className="flex items-center gap-2 border-t border-current/10 px-4 py-1 opacity-90">
-          <Radio className="size-4" aria-hidden />
-          <span className="opacity-75">Latest event</span>
-          <span className="font-semibold">{eventLine(latest)}</span>
+      <div className="flex items-center gap-x-4 border-t border-current/10 px-4 py-1">
+        <p className="flex min-w-0 flex-1 items-center gap-2">
+          <Radio className="size-4 shrink-0" aria-hidden />
+          <span className="shrink-0 opacity-75">Latest event</span>
+          <span className="truncate font-semibold">{latest ? eventLine(latest) : 'Nothing has happened yet tonight'}</span>
         </p>
-      )}
+        <DataChip state={state} />
+      </div>
     </div>
   )
 }
@@ -127,14 +126,18 @@ function Header({ state, route, panel, onPanel }: { state: State; route: Route; 
   const auditBox = route.name === 'box' ? route.number : ''
   return (
     <header className={`sticky top-0 z-20 shadow-md ${harbor ? 'bg-indigo-950 text-white' : 'bg-white text-slate-900'}`}>
-      <div className="flex min-h-16 flex-wrap items-center gap-x-6 gap-y-1 px-4 py-1.5">
+      <div className="flex min-h-16 flex-wrap items-center gap-x-5 gap-y-1 px-4 py-1.5">
         <a href="#/" className="flex items-baseline gap-2">
           <span className="text-2xl font-black tracking-tight">Rung</span>
           <span className="text-lg opacity-75">Gate triage at {state.terminal}</span>
         </a>
         <span className="flex items-center gap-2">
-          <span className={`rounded-md px-3 py-0.5 text-lg font-bold ${harbor ? 'bg-amber-300 text-indigo-950' : 'bg-sky-100 text-sky-900'}`}>{night.name}</span>
-          <span className="opacity-75">{night.tagline}</span>
+          <Hint text={night.tagline}>
+            <span tabIndex={0} className={`rounded-md px-3 py-0.5 text-lg font-bold ${harbor ? 'bg-amber-300 text-indigo-950' : 'bg-sky-100 text-sky-900'}`}>
+              {night.name}
+            </span>
+          </Hint>
+          <span className="hidden opacity-75 2xl:inline">{night.tagline}</span>
         </span>
         <span className="flex items-baseline gap-2">
           <span className="text-2xl font-bold tabular-nums">{time}</span>
@@ -161,18 +164,15 @@ function Header({ state, route, panel, onPanel }: { state: State; route: Route; 
         <Stat label="Released" value={String(c.released)} hint="Trucks that have left the gate since the shift started." />
         <Stat label="Reefers powered" value={String(c.reefers_powered)} hint="Refrigerated boxes with power on, or already gone on a truck." />
         <Stat
-          label="Reefers past safe temperature"
+          label="Reefers lost"
           value={String(c.reefers_lost)}
           tone={c.reefers_lost > 0 ? (harbor ? 'text-red-300' : 'text-red-700') : ''}
           hint="Reefers whose cargo has warmed past its loss limit."
         />
-        <Stat label="Demurrage avoided" value={`${c.demurrage_avoided_usd.toLocaleString('en-US')} USD`} hint="Storage fees saved by releasing boxes before more fees accrue." />
+        <Stat label="Fees avoided" value={`${c.demurrage_avoided_usd.toLocaleString('en-US')} USD`} hint="Demurrage, the daily storage fee a box owes once its free days run out, saved by releasing boxes in time." />
         <Stat label="Bookings kept" value={`${c.throughput_pct}%`} hint="Share of the bookings for tonight that still have a gate slot." />
-        <span className="ml-auto">
-          <DataChip state={state} />
-        </span>
       </div>
-      <AlertStrip state={state} />
+      <StatusStrip state={state} />
     </header>
   )
 }
