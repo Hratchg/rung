@@ -13,7 +13,7 @@ dashed amber **Demo controls** dock at the bottom of the screen.
 4. In the dock, press **Pause** next to **Minutes per second**. The header should read Tuesday, 22:00, Lanes open 6 of 6, and the dock should read Scenario `+00:00`.
 5. Open `CMAU9939083` and check the chip in the **Call the trucker** panel. **Retell web call** means the live agent is loaded. **Simulated call** means no Retell key is loaded and the call will be the scripted one. That still works: leave **The simulated trucker answers** on **Trucker backs the scale**.
 6. Close every terminal and editor window. Never put `.env` or a terminal on the projector.
-7. Rehearse the call once with a stopwatch. With the three trucker lines below it runs about 40 seconds. If it runs longer, use the cut rules at the end of the run of show.
+7. Rehearse the call once with a stopwatch. With the three trucker lines below, the answer lands about 35 seconds after you press **Call the trucker**, and the agent hangs up about 60 seconds after it. If the answer takes longer, use the cut rules at the end of the run of show.
 
 The live call needs someone to play the trucker, Dana Ruiz of Pacific Coast Dray. The presenter can
 do it, or a teammate next to the laptop microphone. Keep each answer short and wait for the agent to
@@ -62,8 +62,8 @@ disagree. Get a reweigh or call the trucker before it leaves.**
 > The manifest says 36,000 pounds. The scale says 40,500. Rung does not guess. It asks. Its voice
 > agent calls the trucker right now.
 
-Click: **Call the trucker** in the **Call the trucker** panel. The status reads Connecting, then On the
-call.
+Click: **Call the trucker** in the **Call the trucker** panel by 0:40. The status reads Connecting, then
+On the call.
 
 The agent introduces itself as the Pier 7 gate desk, checks it has Dana Ruiz, reads both weights, and
 asks whether the box is loaded as weighed. The trucker answers with the three lines above.
@@ -74,6 +74,10 @@ You decide what happens to this box.** The button under **Your move** now reads 
 
 > The trucker backed the scale, so the manifest is wrong. Rung will not pick a side on its own. A
 > person decides, with the call on the record. That was a real call, through Retell.
+
+The answer lands around 1:15. The agent then reads it back and says goodbye, so the call keeps running
+for about 20 more seconds and ends while the prompt drawer is open. Do not wait for it. The transcript
+lands on the card after the agent hangs up.
 
 ### 1:30 The voice agent prompt (18 s)
 
