@@ -86,9 +86,6 @@ drawer opens. Scroll slowly from **Identity** down to **Weight check call** and 
 
 Press **Escape** to close the drawer.
 
-IBM Bob prompts: placeholder, pending confirmation that Bob was used. If it was, show the Bob prompts
-here for at most 10 seconds and take the time from the close.
-
 ### 1:48 Harbor Night: the gate plan (34 s)
 
 Click: the **Gate plan** tab. Then press **2** next to **Minutes per second** in the dock. Every
