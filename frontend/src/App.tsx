@@ -4,12 +4,12 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { useAppState, type State } from './api'
 import { AuditPanel, TwistPanel } from './Audit'
 import BoxCard from './BoxCard'
-import { NIGHT_COPY, eventLine } from './copy'
+import { NIGHT_COPY, emissionsNote, eventLine } from './copy'
 import DemoDock from './Demo'
 import GateScreen from './Gate'
 import { PromptPanel } from './Prompts'
 import Queue from './Queue'
-import { laneList, sayTime } from './format'
+import { laneList, sayKg, sayNum, sayTime } from './format'
 import { BadgeChip, Hint } from './ui'
 
 type Route = { name: 'queue' } | { name: 'gate' } | { name: 'box'; number: string }
@@ -43,12 +43,13 @@ function clockParts(iso: string) {
   return { date: `${MONTHS[month - 1]} ${day}`, time: rest.slice(0, 5) }
 }
 
-function Stat({ label, value, tone = '', hint }: { label: string; value: string; tone?: string; hint: string }) {
+function Stat({ label, value, tone = '', hint, note }: { label: string; value: string; tone?: string; hint: string; note?: string }) {
   return (
     <Hint text={hint}>
       <span tabIndex={0} className="flex items-baseline gap-1.5 whitespace-nowrap">
         <span className="opacity-75">{label}</span>
         <span className={`text-lg font-bold tabular-nums ${tone}`}>{value}</span>
+        {note && <span className="opacity-60">{note}</span>}
       </span>
     </Hint>
   )
@@ -171,6 +172,12 @@ function Header({ state, route, panel, onPanel }: { state: State; route: Route; 
         />
         <Stat label="Fees avoided" value={`${c.demurrage_avoided_usd.toLocaleString('en-US')} USD`} hint="Demurrage, the daily storage fee a box owes once its free days run out, saved by releasing boxes in time." />
         <Stat label="Bookings kept" value={`${c.throughput_pct}%`} hint="Share of the bookings for tonight that still have a gate slot." />
+        <Stat
+          label="Truck idle"
+          note="modelled"
+          value={`${sayNum(c.idle_hours)} h, ${sayKg(c.idle_co2_kg)} kg CO2`}
+          hint={`Hours booked trucks have idled at the gate so far tonight, and the CO2 that idling burned. Closing the terminal would be ${sayNum(state.counters_blunt.idle_hours)} h and ${sayKg(state.counters_blunt.idle_co2_kg)} kg by now. ${emissionsNote(state.emissions)}`}
+        />
       </div>
       <StatusStrip state={state} />
     </header>

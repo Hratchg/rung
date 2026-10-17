@@ -107,6 +107,7 @@ browser, and its chip reads **Retell web call**. Allow the microphone, and answe
 | Box card | Click a box number | What Rung recommends and the next step in one sentence, with **Your move** beside it. Then the call panel and reefer card when they matter, the rule votes, and where the sources disagree. Sources and trust, the full reason, and the history open on demand |
 | Ask call | Box card, **Call the trucker** | The voice agent calls the trucker about a weight conflict. The transcript and outcome land on the card and re-evaluate the box |
 | Voice agent prompt | **See the agent prompt** on the box card, or **Voice agent prompt** in the dock | The exact Retell prompt from `scripts/retell_setup.py`, the values filled in for each call, the tools, and the fields read back after the call |
+| Truck idle and CO2 | Header, box card, Gate plan | Modelled idle hours and kg CO2 for trucks waiting at the gate: so far tonight in the header, per truck on the box card and the gate lists, and saved against closing the terminal in the gate headline. The factor and its DOE and EPA sources sit behind an info icon and in a footnote |
 | Gate plan | Gate plan tab | A headline against closing the terminal, lanes by hourly windows with lane toggles, **Moved to a new slot**, and **No slot tonight** |
 | Audit log | Audit log tab | Every decision line newest first with the reason first, filtered by box |
 | Dark feed banner | Header | Shows how long a feed has been dark. The queue keeps running from the last snapshot |
@@ -131,6 +132,7 @@ and [Reading the screen](docs/how-it-works.md#reading-the-screen) for a tour of 
 | `backend/scenario.py` | Scenario clock, the seeded population, events, planner actions, rated orders, spoof input |
 | `backend/feeds.py` | Simulated reefer telemetry and weighbridge readings |
 | `backend/gate.py` | Gate re-slotting with `scipy.optimize.linear_sum_assignment` and a greedy fallback |
+| `backend/emissions.py` | Truck idle hours at the gate and the CO2 factor, with its sources |
 | `backend/voice.py` | Retell web and phone calls, signature checks, and the scripted simulated call |
 | `backend/t49.py` | Terminal49 poller with the fixture fallback |
 | `backend/audit.py`, `backend/gitdiff.py` | `audit.jsonl` writer and ring buffer, and the twist diff reader |

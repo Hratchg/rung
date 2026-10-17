@@ -1,14 +1,14 @@
 import { useState, type ReactNode } from 'react'
-import { ArrowLeft, CircleCheck, Database, FileText, Phone, ScrollText, Snowflake, TriangleAlert, Vote } from 'lucide-react'
+import { ArrowLeft, CircleCheck, Database, FileText, Fuel, Phone, ScrollText, Snowflake, TriangleAlert, Vote } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { SOURCE_NAMES, useBox, type AuditLine, type Badge, type BoxDetail, type ConflictInfo, type Silence, type SourceName, type Warmup } from './api'
+import { SOURCE_NAMES, useAppState, useBox, type AuditLine, type Badge, type BoxDetail, type ConflictInfo, type Idle, type Silence, type SourceName, type Warmup } from './api'
 import AskCall from './AskCall'
-import { ACTOR, CONFLICT_COPY, STEP_META, nextStepLine, trustLevel } from './copy'
+import { ACTOR, CONFLICT_COPY, IDLE_TONE, STEP_META, emissionsNote, nextStepLine, sentences, trustLevel } from './copy'
 import { OverrideDialog, PlannerActions } from './Decide'
-import { SOURCE_FIELDS, SOURCE_TITLE, sayDateTime, sayHours, sayNum, sayTime, sayValue } from './format'
+import { SOURCE_FIELDS, SOURCE_TITLE, sayDateTime, sayHours, sayKg, sayNum, sayTime, sayValue } from './format'
 import { Notice, plainLfd } from './Queue'
 import SpoofForm from './Spoof'
-import { BadgeChip, CallTags, MiniLadder, NeedsYou, Section, SourceBadges, StepChip, TrustBar, UrgencyHelp, UrgencyMeter } from './ui'
+import { BadgeChip, CallTags, InfoHint, MiniLadder, NeedsYou, Section, SourceBadges, StepChip, TrustBar, UrgencyHelp, UrgencyMeter } from './ui'
 
 const VALUE_LABELS: Record<string, string> = {
   carrier: 'Manifest says',
@@ -83,6 +83,7 @@ export default function BoxCard({ number, onAudit, onPrompt }: { number: string;
               <MiniLadder step={d.step} />
             </Fact>
           </div>
+          {b.idle && <IdleLine idle={b.idle} />}
         </div>
         <div className="flex flex-col gap-2 lg:border-l lg:border-slate-200 lg:pl-6">
           <p className="font-semibold text-slate-600">Your move</p>
@@ -154,6 +155,21 @@ function Fact({ label, children }: { label: ReactNode; children: ReactNode }) {
       <span className="text-slate-600">{label}</span>
       <span className="text-lg font-semibold">{children}</span>
     </div>
+  )
+}
+
+function IdleLine({ idle }: { idle: Idle }) {
+  const emissions = useAppState().data?.emissions
+  const amount = idle.minutes === 0 ? 'No idle' : `${sayHours(idle.minutes / 60)}, ${sayKg(idle.co2_kg)} kg CO2`
+  return (
+    <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-slate-100 pt-3 text-lg" aria-label="Truck idle">
+      <Fuel className="size-5 text-slate-500" aria-hidden />
+      <span className="text-slate-600">Truck idle at the gate</span>
+      <strong className={IDLE_TONE[idle.cause]}>{amount}</strong>
+      <span className="text-slate-700">{sentences(idle.label)[0]}</span>
+      <span className="text-slate-500">Modelled</span>
+      <InfoHint label="How truck idle is counted" text={`${idle.label} ${emissionsNote(emissions)}`} />
+    </p>
   )
 }
 

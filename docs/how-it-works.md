@@ -28,10 +28,10 @@ Every field in the UI carries a badge, live or simulated, so the screen never hi
 The UI is built to be read from across a room at 1280 by 720. Every status color comes with a text
 label, and rule and conflict ids such as R3 or C1 stay as secondary detail behind plain words.
 
-- **Header**, in three rows. The first says where you are: Rung, Gate triage at Pier 7, the night (Tuesday or Harbor Night), the scenario clock, lanes open, and the three screens, **Queue**, **Gate plan**, and **Audit log**. The second row is **Tonight so far**: Released, Reefers powered, Reefers lost, Fees avoided, and Bookings kept. The third shows the latest scenario event on the left and where the data comes from on the right. A red banner sits above it while a feed is dark.
+- **Header**, in three rows. The first says where you are: Rung, Gate triage at Pier 7, the night (Tuesday or Harbor Night), the scenario clock, lanes open, and the three screens, **Queue**, **Gate plan**, and **Audit log**. The second row is **Tonight so far**: Released, Reefers powered, Reefers lost, Fees avoided, Bookings kept, and Truck idle in hours and kg CO2, marked modelled. The third shows the latest scenario event on the left and where the data comes from on the right. A red banner sits above it while a feed is dark.
 - **Queue**. The headline counts the boxes that need a decision. Under it the ladder strip shows the six steps gentlest first, each with its count and a short meaning, and Hand set apart on the right. Click a step to filter. **How the ladder works** explains every step and how the votes are counted. Each row leads with plain words such as Weight mismatch or Hold by customs broker, and has one main button named for the action.
 - **Box card**. The big card says what Rung recommends, the next step in one sentence, the owner, the urgency, and where the step sits on the ladder, with **Your move** on the right. The call panel and the reefer card follow when they matter, then **Why Rung says** with the rule votes next to **Where the sources disagree**. Sources and trust, the full reason, the decision history, and the demo spoof form stay collapsed until opened.
-- **Gate plan**. The headline compares Rung against closing the terminal. The lanes by hour grid follows with an icon key, then **Moved to a new slot** and **No slot tonight**.
+- **Gate plan**. The headline compares Rung against closing the terminal, in trucks kept, idle hours, and kg CO2. The lanes by hour grid follows with an icon key, then **Moved to a new slot** and **No slot tonight**.
 - **Demo controls**. A dashed amber dock at the bottom holds everything that drives the scenario: **Reset**, **Minutes per second**, the next scripted event, **Voice agent prompt**, and **More controls** with the event buttons, reefer faults, rated orders, the scripted timeline, and the twist log. None of it is part of the planner's app.
 
 ## Architecture
@@ -264,9 +264,58 @@ newest first with a box filter, and each box card shows its own history.
 
 At `+00:10`, with lanes 4 to 6 closed, it moves 47 trucks and overflows 20 in under 1 ms. The target
 was 100 ms. The headline of the Gate plan screen compares Rung against the blunt move of closing the
-terminal, for example "Lanes 4 to 6 are closed. Rung keeps 96 of 129 trucks moving." Three cards under
-it show trucks kept on the gate plan (96 of 129 against 0), reefers kept, and last free day boxes kept,
-and a line below them compares bookings kept, released so far, and reefers lost.
+terminal, for example "Lanes 4 to 6 are closed. Rung keeps 96 of 129 trucks moving and saves 89 idle
+hours and 725 kg of CO2." Four cards under it show trucks kept on the gate plan (96 of 129 against 0),
+reefers kept, last free day boxes kept, and truck idle at the gate tonight in kg CO2 and hours. A line
+below them compares bookings kept, released so far, and reefers lost. See [Emissions](#emissions).
+
+## Emissions
+
+Rung limits delays and costs, and it counts emissions too: the CO2 trucks burn idling at the gate.
+Every idle number uses one factor, `KG_CO2_PER_IDLE_HOUR` in `backend/emissions.py`, 8.144 kg CO2
+per truck idle hour.
+
+- A heavy duty diesel truck burns about 0.8 gallon of diesel an hour at idle. DOE and Argonne National Laboratory, [Long-Haul Truck Idling Burns Up Profits](https://afdc.energy.gov/files/u/publication/hdv_idling_2015.pdf), 2015.
+- A gallon of diesel makes 10,180 g of CO2. EPA, [Greenhouse Gas Emissions from a Typical Passenger Vehicle](https://www.epa.gov/greenvehicles/greenhouse-gas-emissions-typical-passenger-vehicle), the factor from 40 CFR 600.113.
+- 0.8 times 10.18 is 8.144. EPA and ORNL measured 8.224 kg CO2 an hour on nine idling Class 8 trucks (SAE 2003-01-0288), a close cross check.
+
+Idle hours come from the gate plan. Each booked truck reaches the gate at the start of the window it
+was first booked for, and idles until it gets through or gives up. It gives up after one hour, the
+length of an appointment window and the hour after which Rung stops counting a truck as due.
+
+| Case | Idle for that truck |
+| --- | --- |
+| Kept in its booked hour, in any lane | 0 |
+| Moved to a later slot: SLOW, a closed lane, or a full lane | New slot start minus booked start, at most 1 h |
+| No open slot tonight (overflow) | 1 h, then turned away |
+| HOLD | 1 h, then turned away |
+| WATCH, ASK, or HAND on a dark feed it depends on, once its slot has started | The minutes it has waited since its slot started or the feed went dark, whichever is later. Nobody knows when the feed returns, so Rung does not guess |
+
+WATCH, ASK, and HAND for other reasons are taken to settle within the slot, because a re-poll, a
+reweigh, or a call takes minutes. The blunt move closes the terminal without a new plan, so every
+booked truck still comes and waits out its hour. "So far" counts the minutes each truck has already
+spent. A truck's idle is frozen when it gates out or its window ends, so the count never drops.
+
+| Where | Fields |
+| --- | --- |
+| `/api/queue` rows and `/api/box/{number}` | `idle`: expected `minutes`, `co2_kg`, `so_far_minutes`, `cause`, `settled`, and a `label`. Null when no truck is booked |
+| `/api/state` | `idle_hours` and `idle_co2_kg` so far tonight in `counters` and `counters_blunt`, and the factor with its sources in `emissions` |
+| `/api/gate` `moved`, `overflow`, `held` | `idle_minutes` and `co2_kg` for each truck |
+| `/api/gate` `compare` | `idle_hours_plan` and `idle_co2_kg_plan` for `rung` and `blunt`, then `idle_hours_avoided`, `idle_co2_kg_avoided`, and `idle_label` |
+
+On Tuesday at `+00:00` the plan idles only the 13 HOLD trucks: 13 h and 106 kg CO2, against 129 h and
+1,051 kg if the terminal closes. At `+00:10`, with lanes 4 to 6 closed, Rung keeps 89 trucks in their
+booked hour, moves 7 to a later hour, and overflows 20. Its plan idles the 129 trucks 40 h, 326 kg
+CO2. Closing the terminal idles them 129 h, 1,051 kg. Rung avoids 89 idle hours and 725 kg CO2.
+
+On screen, every idle number is marked as modelled, and the factor and its sources sit one step
+back as secondary detail:
+
+- The header counter **Truck idle** shows `idle_hours` and `idle_co2_kg` so far tonight. Hover it for the same numbers if the terminal had closed, the factor, and the sources.
+- The box card shows **Truck idle at the gate** under the recommendation: the minutes, the kg CO2, and the first sentence of the label, colored by cause with the words beside it. The info icon holds the full label and the factor.
+- The Gate plan headline and its fourth card use `idle_hours_avoided`, `idle_co2_kg_avoided`, and the two `idle_co2_kg_plan` values. A footnote names the factor and links both sources. **Moved to a new slot** and **No slot tonight** add each truck's idle minutes and kg CO2.
+
+Emissions do not change the ladder or the optimizer cost, and `evaluate()` is untouched.
 
 ## The ask call
 
@@ -363,8 +412,8 @@ scripted `twist-1` placeholder.
 `make test` runs the pytest suite: the engine cases from the spec (the Harbor Night box, a clear box,
 a low urgency C2 box, a dark terminal with a pending release), the API and reset, the gate optimizer
 with lanes 4 to 6 closed, the voice paths with a fake Retell client, the Retell setup and tunnel
-scripts, the prompt endpoint, fixture mode, and every Phase 5 feature. The suite blanks real keys, so
-it never calls an outside service.
+scripts, the prompt endpoint, fixture mode, every Phase 5 feature, and the idle and CO2 numbers. The
+suite blanks real keys, so it never calls an outside service.
 
 `cd frontend && npm test` runs the Vitest suite. It lints every UI string in `frontend/src` for the
 spec's copy rules (no contractions, no dashes, no semicolons in on screen text), and checks the ladder

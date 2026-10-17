@@ -33,6 +33,8 @@ def test_state_shape(client):
         "reefers_lost",
         "demurrage_avoided_usd",
         "throughput_pct",
+        "idle_hours",
+        "idle_co2_kg",
     }
     assert set(s["legend"]) == {"live", "simulated"}
     assert {"live_count", "last_ok", "status"} <= set(s["poller"])

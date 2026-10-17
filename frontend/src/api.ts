@@ -13,6 +13,28 @@ export type Counters = {
   reefers_lost: number
   demurrage_avoided_usd: number
   throughput_pct: number
+  idle_hours: number
+  idle_co2_kg: number
+}
+
+export type IdleCause = 'kept' | 'moved' | 'overflow' | 'hold' | 'dark'
+
+export type Idle = {
+  minutes: number
+  co2_kg: number
+  so_far_minutes: number
+  cause: IdleCause
+  settled: boolean
+  label: string
+}
+
+export type Emissions = {
+  kg_co2_per_idle_hour: number
+  idle_gallons_per_hour: number
+  kg_co2_per_gallon_diesel: number
+  idle_limit_hours: number
+  label: string
+  sources: { label: string; url: string }[]
 }
 
 export type Poller = {
@@ -52,6 +74,7 @@ export type State = {
   voice: { mode: 'mock' | 'web' | 'phone'; missing: string[]; phone_enabled: boolean }
   dark_feed: DarkFeedLine[]
   rated: RatedInfo
+  emissions: Emissions
 }
 
 export type DarkFeedLine = {
@@ -125,6 +148,7 @@ export type QueueRow = {
   rated: RatedClock | null
   dray_carrier: string | null
   clocks: Clocks
+  idle: Idle | null
   badges: Record<SourceName, Badge>
 }
 
@@ -258,6 +282,7 @@ export type BoxDetail = {
   fired: FiredRule[]
   decision: EffectiveDecision
   clocks: Clocks
+  idle: Idle | null
   warmup: Warmup | null
   history: AuditLine[]
   rated: RatedClock | null
@@ -321,9 +346,12 @@ export type GateChip = {
 
 export type RatedRowStatus = 'released' | 'on_time' | 'late' | 'overflow' | 'held' | 'missed' | 'no_appointment'
 
-export type GateOverflow = GateChip & { reason: string; slid: boolean; slid_from: { lane: number; window: string } | null }
+export type GateIdle = { idle_minutes: number; co2_kg: number }
 
-export type GateMove = {
+export type GateOverflow = GateChip &
+  GateIdle & { reason: string; slid: boolean; slid_from: { lane: number; window: string } | null }
+
+export type GateMove = GateIdle & {
   box: string
   old_lane: number
   old_window: string
@@ -336,7 +364,13 @@ export type GateMove = {
   lfd_today: boolean
 }
 
-type CompareSide = Omit<Counters, 'released_blunt'> & { kept: number; reefers_kept: number; lfd_kept: number }
+type CompareSide = Omit<Counters, 'released_blunt'> & {
+  kept: number
+  reefers_kept: number
+  lfd_kept: number
+  idle_hours_plan: number
+  idle_co2_kg_plan: number
+}
 
 export type Gate = {
   lanes: { id: number; open: boolean }[]
@@ -347,7 +381,7 @@ export type Gate = {
   placed: Record<string, GateChip & { moved: boolean }>
   moved: GateMove[]
   overflow: GateOverflow[]
-  held: (GateChip & { reason: string })[]
+  held: (GateChip & GateIdle & { reason: string })[]
   missed: string[]
   rated: RatedInfo & { slid: number; rows: { box: string; status: RatedRowStatus; text: string; urgency: number }[] }
   solve_ms: number
@@ -360,6 +394,9 @@ export type Gate = {
     lfd_total: number
     rung: CompareSide
     blunt: CompareSide
+    idle_hours_avoided: number
+    idle_co2_kg_avoided: number
+    idle_label: string
   }
 }
 

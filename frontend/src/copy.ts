@@ -1,4 +1,4 @@
-import type { ScenarioEvent, Step } from './api'
+import type { Emissions, IdleCause, ScenarioEvent, Step } from './api'
 import { laneList, sayTime } from './format'
 
 /** Strongest first. The queue groups and the override picker use this order. */
@@ -294,4 +294,22 @@ export const PROMPT_COPY = {
     callback_needed: 'True when a planner should call the trucker back',
     notes: 'One or two sentences on what the trucker said',
   } as Record<string, string>,
+}
+
+export const IDLE_TONE: Record<IdleCause, string> = {
+  kept: 'text-emerald-800',
+  moved: 'text-amber-900',
+  overflow: 'text-red-800',
+  hold: 'text-red-800',
+  dark: 'text-red-800',
+}
+
+/** The factor and its sources, as secondary detail wherever an idle or CO2 number shows. */
+export function emissionsNote(e: Emissions | undefined): string {
+  if (!e) return 'Modelled, not measured.'
+  return `Modelled, not measured. ${e.label} Sources: ${e.sources.map((s) => sourceTitle(s.label)).join(', and ')}.`
+}
+
+export function sourceTitle(label: string): string {
+  return label.split('. ')[0]
 }

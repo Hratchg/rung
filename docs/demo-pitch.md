@@ -31,9 +31,9 @@ finish its turn. The lines:
 | 0:15 | Tuesday: the queue and the ladder | 18 s |
 | 0:33 | The live ask call | 57 s |
 | 1:30 | The voice agent prompt | 18 s |
-| 1:48 | Harbor Night: the gate plan | 32 s |
-| 2:20 | The box that matters | 18 s |
-| 2:38 | The audit log and the close | 12 s |
+| 1:48 | Harbor Night: the gate plan | 34 s |
+| 2:22 | The box that matters | 17 s |
+| 2:39 | The audit log and the close | 11 s |
 | 2:50 | End | |
 
 ### 0:00 The problem (15 s)
@@ -89,7 +89,7 @@ Press **Escape** to close the drawer.
 IBM Bob prompts: placeholder, pending confirmation that Bob was used. If it was, show the Bob prompts
 here for at most 10 seconds and take the time from the close.
 
-### 1:48 Harbor Night: the gate plan (32 s)
+### 1:48 Harbor Night: the gate plan (34 s)
 
 Click: the **Gate plan** tab. Then press **2** next to **Minutes per second** in the dock. Every
 scenario minute now takes half a real second, and the scripted events fire on their own.
@@ -97,18 +97,21 @@ scenario minute now takes half a real second, and the scripted events fire on th
 > Same app, same code, the worst night of the year.
 
 - After 3 seconds the header turns dark blue and the chip reads **Harbor Night**.
-- After 5 seconds lanes 4 to 6 close. The header reads Lanes open 3 of 6, Closed 4 to 6, and the headline reads **Lanes 4 to 6 are closed. Rung keeps 96 of 129 trucks moving.**
+- After 5 seconds lanes 4 to 6 close. The header reads Lanes open 3 of 6, Closed 4 to 6, and the headline reads **Lanes 4 to 6 are closed. Rung keeps 96 of 129 trucks moving and saves 89 idle hours and 725 kg of CO2.**
 - After 10 seconds a customs hold lands on `TCLU7654321`.
 - After 20 seconds the red **Terminal feed dark** banner appears. Press **Pause** right away.
 
+Say the first line while the events fire, and the rest after **Pause**.
+
 > Half the gate went down, customs placed a hold, and the terminal feed went dark. Rung re-planned
-> every truck in under a millisecond. It keeps 96 of 129 trucks moving, and every reefer. Closing the
-> terminal keeps none.
+> every truck in under a millisecond. It keeps 96 of 129 trucks moving and every reefer, and by our
+> model it saves about 750 kilograms of CO2 from trucks idling at the gate.
 
-Point at the three cards under the headline: Rung 96 against Closed terminal 0, reefers 20 of 20,
-last free day boxes 28 of 28.
+Point at the four cards under the headline: Rung 96 against Closed terminal 0, reefers 20 of 20, last
+free day boxes 28 of 28, and truck idle CO2. At the pause the headline reads about 92 idle hours and
+750 kg. The plan changes as the night moves, so these numbers drift by a few kg.
 
-### 2:20 The box that matters (18 s)
+### 2:22 The box that matters (17 s)
 
 Click: the **Queue** tab, the **Hold** step in the ladder, then **MSKU1234567**.
 
@@ -121,13 +124,13 @@ customs broker clears it. The reefer evidence goes with it.** The amber reefer c
 
 Click: **Confirm hold** under **Your move**.
 
-### 2:38 The audit log and the close (12 s)
+### 2:39 The audit log and the close (11 s)
 
 Click: the **Audit log** tab in the header. It opens filtered to `MSKU1234567`, with the planner line on
 top.
 
-> Every step, call, and override lands here with its reason. A person signs every hard call. On the
-> worst night of the year Rung kept 96 of 129 trucks moving. That is Rung.
+> Every step, call, and override lands here with its reason, and a person signs every hard call.
+> That is Rung.
 
 ### Cut rules
 
@@ -172,6 +175,12 @@ Press **Voice agent prompt** in the dock, or **See the agent prompt** on any box
 shows the prompt, the six values filled in for each call, the tools the agent can use, and the
 fields read back after the call. It comes from `GET /api/prompts`, which reads
 `scripts/retell_setup.py`, the same script that creates the agent, so the two cannot drift apart.
+
+**Is the CO2 number measured?**
+No, it is modelled. Rung counts how long each booked truck idles at the gate under its plan and if the
+terminal closed, and multiplies by 8.14 kg CO2 per idle hour: about 0.8 gallon of diesel an hour at
+idle (DOE and Argonne, 2015) times 10.18 kg CO2 a gallon (EPA). The footnote on the Gate plan links
+both sources. It never changes a decision.
 
 **What if the voice agent mishears?**
 An unclear answer is recorded as unknown, which keeps the conflict open and votes HOLD. Even a clear

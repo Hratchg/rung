@@ -1,10 +1,11 @@
 import { useMemo, type ReactNode } from 'react'
 import { ArrowRightLeft, CalendarClock, Flag, Snowflake, type LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { useGate, useLaneToggle, type Gate, type GateChip, type RatedRowStatus } from './api'
-import { laneList, sayHours, sayTime } from './format'
+import { useAppState, useGate, useLaneToggle, type Emissions, type Gate, type GateChip, type GateIdle, type RatedRowStatus } from './api'
+import { emissionsNote } from './copy'
+import { laneList, sayHours, sayKg, sayNum, sayTime } from './format'
 import { Notice } from './Queue'
-import { StepChip } from './ui'
+import { InfoHint, StepChip } from './ui'
 
 const TAGS: { key: 'reefer' | 'lfd_today' | 'moved' | 'rated'; icon: LucideIcon; label: string; className: string }[] = [
   { key: 'reefer', icon: Snowflake, label: 'Reefer', className: 'bg-sky-700 text-white' },
@@ -56,8 +57,31 @@ function SolverLine({ gate }: { gate: Gate }) {
   )
 }
 
+function idleText(t: GateIdle): string {
+  return t.idle_minutes > 0 ? ` Idles ${sayHours(t.idle_minutes / 60)} at the gate, ${sayKg(t.co2_kg)} kg CO2.` : ''
+}
+
+function EmissionsFootnote({ emissions }: { emissions: Emissions | undefined }) {
+  if (!emissions) return null
+  return (
+    <p className="mt-2 flex flex-wrap items-center gap-x-1.5 text-slate-600">
+      <span>Idle CO2 is modelled, not measured, at {sayNum(emissions.kg_co2_per_idle_hour, 2)} kg per truck idle hour. Sources:</span>
+      {emissions.sources.map((src, i) => (
+        <span key={src.url}>
+          <a href={src.url} target="_blank" rel="noreferrer" title={src.label} className="underline decoration-slate-400 underline-offset-2 hover:text-slate-900">
+            {src.label.split(',')[0]}
+          </a>
+          {i < emissions.sources.length - 1 ? ',' : ''}
+        </span>
+      ))}
+      <InfoHint label="How the CO2 factor is built" text={emissionsNote(emissions)} />
+    </p>
+  )
+}
+
 function Hero({ gate }: { gate: Gate }) {
-  const { rung, blunt, appointments, reefers_total, lfd_total } = gate.compare
+  const emissions = useAppState().data?.emissions
+  const { rung, blunt, appointments, reefers_total, lfd_total, idle_hours_avoided, idle_co2_kg_avoided } = gate.compare
   const closed = gate.lanes.filter((l) => !l.open).map((l) => l.id)
   const big: [string, number, number, number][] = [
     ['Trucks kept on the gate plan', rung.kept, 0, appointments],
@@ -73,7 +97,7 @@ function Hero({ gate }: { gate: Gate }) {
     <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" aria-label="Rung against closing the terminal">
       <h2 className="text-2xl font-bold tracking-tight">
         {closed.length > 0
-          ? `Lanes ${laneList(closed)} are closed. Rung keeps ${rung.kept} of ${appointments} trucks moving.`
+          ? `Lanes ${laneList(closed)} are closed. Rung keeps ${rung.kept} of ${appointments} trucks moving and saves ${sayNum(idle_hours_avoided, 0)} idle hours and ${sayKg(idle_co2_kg_avoided)} kg of CO2.`
           : `All ${gate.lanes.length} lanes are open. Rung keeps ${rung.kept} of ${appointments} trucks on the plan.`}
       </h2>
       <p className="text-lg text-slate-700">
@@ -82,7 +106,7 @@ function Hero({ gate }: { gate: Gate }) {
           : 'When lanes close, Rung moves every booked truck to the best open slot, reefers and last free day boxes first.'}{' '}
         <SolverLine gate={gate} />
       </p>
-      <div className="mt-3 grid gap-3 md:grid-cols-3">
+      <div className="mt-3 grid gap-3 md:grid-cols-4">
         {big.map(([label, a, b, total]) => (
           <div key={label} className="rounded-lg border border-slate-200 px-4 py-3">
             <p className="text-slate-700">{label}</p>
@@ -98,6 +122,19 @@ function Hero({ gate }: { gate: Gate }) {
             </p>
           </div>
         ))}
+        <div className="rounded-lg border border-slate-200 px-4 py-3">
+          <p className="text-slate-700">Truck idle at the gate tonight</p>
+          <p className="mt-1 flex items-baseline gap-2">
+            <span className="font-semibold text-emerald-800">Rung</span>
+            <span className="text-3xl font-bold tabular-nums">{sayKg(rung.idle_co2_kg_plan)}</span>
+            <span className="text-lg text-slate-600">kg CO2, {sayNum(rung.idle_hours_plan, 0)} h</span>
+          </p>
+          <p className="flex items-baseline gap-2">
+            <span className="font-semibold text-red-800">Closed terminal</span>
+            <span className="text-lg font-semibold tabular-nums">{sayKg(blunt.idle_co2_kg_plan)}</span>
+            <span className="text-slate-600">kg, {sayNum(blunt.idle_hours_plan, 0)} h</span>
+          </p>
+        </div>
       </div>
       <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-1">
         {small.map(([label, a, b]) => (
@@ -111,6 +148,7 @@ function Hero({ gate }: { gate: Gate }) {
           </div>
         ))}
       </dl>
+      <EmissionsFootnote emissions={emissions} />
     </section>
   )
 }
@@ -239,7 +277,10 @@ function Moved({ gate }: { gate: Gate }) {
               <span className="tabular-nums text-slate-700">Urgency {m.urgency}</span>
               <span className="ml-auto font-semibold tabular-nums">{m.delay_hours > 0 ? `${sayHours(m.delay_hours)} later` : 'Same window'}</span>
             </div>
-            <p className="text-slate-800">{m.reason}</p>
+            <p className="text-slate-800">
+              {m.reason}
+              {idleText(m)}
+            </p>
           </li>
         ))}
       </ul>
@@ -268,6 +309,7 @@ function Overflow({ gate }: { gate: Gate }) {
             </div>
             <p className="text-slate-800">
               Booked {o.window} lane {o.lane}. {o.reason}
+              {idleText(o)}
             </p>
           </li>
         ))}

@@ -26,6 +26,10 @@ export function sayHours(hours: number): string {
   return m ? `${h} h ${m} min` : `${h} h`
 }
 
+export function sayKg(kg: number): string {
+  return kg >= 100 ? Math.round(kg).toLocaleString('en-US') : sayNum(kg)
+}
+
 const lb = (v: unknown) => `${Math.round(Number(v)).toLocaleString('en-US')} lb`
 const celsius = (v: unknown) => `${sayNum(Number(v))} C`
 const yesNo = (v: unknown) => (v === true ? 'Yes' : v === false ? 'No' : 'Unknown')
