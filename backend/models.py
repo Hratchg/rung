@@ -51,6 +51,11 @@ HOLD_LABELS = {
 }
 WEIGHT_OWNER = "shipping line"
 
+CALL_OUTCOMES = ("confirmed_empty", "confirmed_loaded", "reschedule_accepted", "unknown")
+# Which source a trucker call backs: confirmed_empty backs the manifest, confirmed_loaded the scale.
+CALL_CONFIRMS = {"confirmed_empty": "carrier", "confirmed_loaded": "weighbridge"}
+CALL_TRUST_BONUS = 0.2
+
 
 @dataclass
 class Reading:
@@ -90,6 +95,7 @@ class Box:
     weight_asked: bool = False
     pending_release: bool = False
     live_sources: frozenset[str] = frozenset()
+    call_outcome: str | None = None
 
     def source(self, name: str) -> dict | None:
         return getattr(self, name)
@@ -194,6 +200,10 @@ class DecisionIn(BaseModel):
 
 class JumpIn(BaseModel):
     t: str = Field(pattern=r"^\+\d{2}:\d{2}$")
+
+
+class CallIn(BaseModel):
+    mock_outcome: Literal["confirmed_empty", "confirmed_loaded", "reschedule_accepted", "unknown"] | None = None
 
 
 class LaneIn(BaseModel):

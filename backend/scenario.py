@@ -21,9 +21,18 @@ from .audit import Audit, decision_line
 from .engine import evaluate
 from .feeds import ReeferModel, loss_limit_c, reefer_model, weighbridge_reading
 from .gate import Appt, Assignment, solve
-from .models import CUSTOMS_HOLD_NAMES, STEPS, Box, Decision
+from .models import CALL_OUTCOMES, CUSTOMS_HOLD_NAMES, STEPS, Box, Decision
 from .t49 import map_container
 from .timefmt import format_offset, hours_between, iso, lfd_deadline, parse_date, parse_dt, parse_offset, window_at
+from .voice import trucker_name
+
+CALL_FINAL = ("ended", "error", "not_connected")
+CALL_EFFECTS = {
+    "confirmed_empty": "Trucker backed the manifest. C1 cleared and carrier trust raised.",
+    "confirmed_loaded": "Trucker backed the scale. Weighbridge trust raised and the box goes to a planner.",
+    "reschedule_accepted": "Trucker accepted a later slot. C1 stays open.",
+    "unknown": "The call did not settle the weight. C1 stays open and the box stays on HOLD.",
+}
 
 OWNER_CODES = ("MSKU", "TCLU", "CMAU", "HLBU", "ONEU", "MSCU")
 DRAY_CARRIERS = (
@@ -265,6 +274,7 @@ class BoxState:
     planner: dict | None = None
     released_at: datetime | None = None
     demurrage_avoided: float = 0.0
+    call: dict | None = None
 
     def reefer_reading(self, now: datetime) -> dict | None:
         return self.reefer_model.reading(now) if self.reefer_model else None
@@ -367,6 +377,7 @@ class Scenario:
             weight_asked=state.weight_asked,
             pending_release=state.pending_release,
             live_sources=frozenset(state.live_sources),
+            call_outcome=(state.call or {}).get("outcome"),
         )
 
     def advance(self) -> datetime:
@@ -517,6 +528,144 @@ class Scenario:
         appt["at"] = iso(window_at(slot[1], self.start))
         self.gate_cache = None
         return f"Moved from {old_window} lane {old_lane} to {slot[1]} lane {slot[0]}."
+
+    def call_variables(self, number: str) -> tuple[dict[str, str], str | None]:
+        """Retell dynamic variables, all strings, and the trucker phone for a phone call."""
+        with self.lock:
+            state = self.boxes.get(number)
+            if state is None:
+                raise KeyError(number)
+            if state.released_at:
+                raise ValueError("Box already released. There is nobody to ask.")
+            appt = state.appointment or {}
+            weigh = weighbridge_reading(state.weighbridge) or {}
+            manifest = (state.carrier or {}).get("weight_in_lbs")
+            measured = weigh.get("measured_weight_lbs")
+            variables = {
+                "container_number": number,
+                "manifest_weight_lbs": str(int(manifest)) if manifest is not None else "unknown",
+                "measured_weight_lbs": str(int(measured)) if measured is not None else "unknown",
+                "appointment_time": appt.get("window", "unknown"),
+                "trucker_name": trucker_name(number),
+                "dray_carrier": appt.get("dray_carrier", "unknown"),
+            }
+            return variables, appt.get("trucker_phone")
+
+    def call_active(self, number: str) -> bool:
+        call = (self.boxes[number].call or {}) if number in self.boxes else {}
+        return bool(call) and (call.get("outcome") is None or call.get("status") not in CALL_FINAL)
+
+    def call_started(self, number: str, info: dict, variables: dict[str, str]) -> dict:
+        with self.lock:
+            self.advance()
+            state = self.boxes[number]
+            before = self.effective(state)["step"]
+            state.weight_asked = True
+            state.call = {
+                "call_id": info["call_id"],
+                "mode": info["mode"],
+                "mock": bool(info.get("mock")),
+                "status": "registered",
+                "started_at": iso(self.now),
+                "started_wall": time.time(),
+                "trucker_name": variables["trucker_name"],
+                "dray_carrier": variables["dray_carrier"],
+                "transcript": [],
+                "outcome": None,
+                "callback_needed": None,
+                "notes": "",
+                "source": None,
+                "recorded_at": None,
+            }
+            d = self._evaluate(state)
+            kind = "Phone" if info["mode"] == "phone" else "Web"
+            mock = " Simulated, no Retell key." if info.get("mock") else ""
+            self.audit.write(
+                decision_line(
+                    d,
+                    iso(self.now),
+                    before,
+                    actor="voice",
+                    step="ASK",
+                    action="call",
+                    call_id=info["call_id"],
+                    outcome=None,
+                    effect=f"{kind} call {info['call_id']} started to {variables['trucker_name']} of {variables['dray_carrier']}.{mock}",
+                )
+            )
+            return dict(state.call)
+
+    def call_update(self, number: str, call_id: str, status: str, transcript: list[dict]) -> None:
+        with self.lock:
+            state = self.boxes.get(number)
+            if not state or not state.call or state.call["call_id"] != call_id:
+                return
+            state.call["status"] = status
+            if transcript:
+                state.call["transcript"] = transcript
+
+    def record_call(self, number: str, call_id: str | None, analysis: dict, source: str) -> dict:
+        """Apply the call outcome, re-evaluate the box, and write the audit line with the call id."""
+        outcome = analysis.get("outcome") if analysis.get("outcome") in CALL_OUTCOMES else "unknown"
+        with self.lock:
+            self.advance()
+            state = self.boxes.get(number)
+            if state is None:
+                raise KeyError(number)
+            call = state.call
+            if call is None or (call_id and call["call_id"] != call_id):
+                call = state.call = {
+                    "call_id": call_id or "unknown",
+                    "mode": "phone",
+                    "mock": False,
+                    "status": "ended",
+                    "started_at": iso(self.now),
+                    "started_wall": time.time(),
+                    "trucker_name": trucker_name(number),
+                    "dray_carrier": (state.appointment or {}).get("dray_carrier", "unknown"),
+                    "transcript": [],
+                    "outcome": None,
+                    "callback_needed": None,
+                    "notes": "",
+                    "source": None,
+                    "recorded_at": None,
+                }
+            if call["outcome"] == outcome:
+                return self.effective(state)
+            before = self.effective(state)["step"]
+            call.update(
+                outcome=outcome,
+                callback_needed=bool(analysis.get("callback_needed")),
+                notes=str(analysis.get("notes") or ""),
+                source=source,
+                recorded_at=iso(self.now),
+            )
+            state.weight_asked = True
+            d = self._evaluate(state)
+            self.audit.write(
+                decision_line(
+                    d,
+                    iso(self.now),
+                    before,
+                    actor="voice",
+                    action="call_outcome",
+                    call_id=call["call_id"],
+                    outcome=outcome,
+                    callback_needed=call["callback_needed"],
+                    note=call["notes"],
+                    effect=CALL_EFFECTS[outcome],
+                )
+            )
+            return self.effective(state)
+
+    def active_calls(self) -> list[tuple[str, dict]]:
+        """Calls still owed a transcript or an outcome. A record function can land the outcome mid call."""
+        with self.lock:
+            return [
+                (s.number, dict(s.call))
+                for s in self.boxes.values()
+                if s.call and (s.call["outcome"] is None or s.call["status"] not in CALL_FINAL)
+            ]
 
     def _repoll(self, state: BoxState) -> str:
         if "terminal" in self.dark_sources:

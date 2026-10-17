@@ -5,6 +5,8 @@ from datetime import datetime
 
 from .feeds import cargo_kind
 from .models import (
+    CALL_CONFIRMS,
+    CALL_TRUST_BONUS,
     CUSTOMS_HOLD_NAMES,
     HOLD_OWNERS,
     HOLD_PRIORITY,
@@ -75,7 +77,14 @@ def _holds(readings: dict[str, dict]) -> tuple[list[dict], list[dict]]:
 def _conflicts(box, now, readings, ages, dark, active, pending, available, lfd, lfd_hours) -> list[Conflict]:
     out: list[Conflict] = []
     carrier, weigh = readings.get("carrier"), readings.get("weighbridge")
-    if carrier and weigh and carrier.get("weight_in_lbs") is not None and weigh.get("measured_weight_lbs") is not None:
+    backed_manifest = box.call_outcome == "confirmed_empty"
+    if (
+        not backed_manifest
+        and carrier
+        and weigh
+        and carrier.get("weight_in_lbs") is not None
+        and weigh.get("measured_weight_lbs") is not None
+    ):
         a = float(carrier["weight_in_lbs"])
         b = float(weigh["measured_weight_lbs"])
         gap = abs(b - a)
@@ -163,8 +172,9 @@ def _demurrage(terminal: dict) -> float:
     )
 
 
-def _trust(present, readings, ages, dark, conflicts) -> dict[str, Trust]:
+def _trust(present, readings, ages, dark, conflicts, call_outcome: str | None = None) -> dict[str, Trust]:
     out: dict[str, Trust] = {}
+    confirmed = CALL_CONFIRMS.get(call_outcome or "")
     for name in SOURCES:
         spec = SOURCE_SPECS[name]
         if name not in present:
@@ -178,11 +188,11 @@ def _trust(present, readings, ages, dark, conflicts) -> dict[str, Trust]:
         n = sum(1 for c in conflicts if name in c.sources)
         value = spec.base * freshness * 0.7**n
         noun = "conflict" if n == 1 else "conflicts"
-        out[name] = Trust(
-            name,
-            round(value, 2),
-            f"{name}: base {spec.base:.2f}, age {say_age(age)}, freshness {freshness:.2f}, {n} {noun}, trust {value:.2f}",
-        )
+        reason = f"{name}: base {spec.base:.2f}, age {say_age(age)}, freshness {freshness:.2f}, {n} {noun}, trust {value:.2f}"
+        if name == confirmed:
+            value = min(0.99, value + CALL_TRUST_BONUS)
+            reason += f", plus {CALL_TRUST_BONUS:.2f} because the trucker call backed it, trust {value:.2f}"
+        out[name] = Trust(name, round(value, 2), reason)
     return out
 
 
@@ -242,7 +252,7 @@ def build_ctx(box: Box, now: datetime) -> tuple[Ctx, dict[str, Trust], list[Read
     appt_at = parse_dt((box.appointment or {}).get("at")) or parse_dt((terminal or {}).get("pickup_appointment_at"))
     appt_hours = hours_between(appt_at, now) if appt_at else None
     conflicts = _conflicts(box, now, readings, ages, dark, active, pending, available, lfd, lfd_hours)
-    trust = _trust(present, readings, ages, dark, conflicts)
+    trust = _trust(present, readings, ages, dark, conflicts, box.call_outcome)
     urgency = _urgency(readings, active, pending, lfd_hours, appt_hours)
     ctx = Ctx(
         box=box,
@@ -314,7 +324,7 @@ def evaluate(box: Box, now: datetime, rules: list[Rule] | None = None) -> Decisi
         any(rule.hand for rule in fired)
         or "HAND" in steps
         or step == "HOLD"
-        or (step == "RELEASE" and bool(ctx.conflicts))
+        or (step == "RELEASE" and (bool(ctx.conflicts) or box.call_outcome is not None))
     )
     pinned = step == "RELEASE" and any(rule.pin for rule in fired)
     owner = _owner(ctx, fired, step)

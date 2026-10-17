@@ -11,6 +11,12 @@ export const STEP_META: Record<Step, { meaning: string; chip: string; rail: stri
   RELEASE: { meaning: 'Cleared to dispatch at its slot. Planner confirms with one tap', chip: 'bg-emerald-700 text-white', rail: 'border-emerald-600' },
 }
 
+export const ACTOR: Record<string, { label: string; tone: string }> = {
+  planner: { label: 'Planner', tone: 'text-violet-800' },
+  engine: { label: 'Engine', tone: 'text-slate-700' },
+  voice: { label: 'Voice', tone: 'text-sky-800' },
+}
+
 export function trustLevel(value: number): { label: string; bar: string; text: string } {
   if (value <= 0) return { label: 'None', bar: 'bg-slate-400', text: 'text-slate-700' }
   if (value < 0.3) return { label: 'Low', bar: 'bg-red-600', text: 'text-red-800' }

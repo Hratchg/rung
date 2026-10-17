@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { SOURCE_NAMES, type Badge, type SourceName, type Step } from './api'
+import { SOURCE_NAMES, type AuditLine, type Badge, type SourceName, type Step } from './api'
 import { STEP_META, trustLevel } from './format'
 
 export function StepChip({ step, size = 'md' }: { step: Step; size?: 'md' | 'lg' }) {
@@ -10,6 +10,15 @@ export function StepChip({ step, size = 'md' }: { step: Step; size?: 'md' | 'lg'
       }`}
     >
       {step}
+    </span>
+  )
+}
+
+export function CallTags({ line }: { line: AuditLine }) {
+  return (
+    <span className="flex flex-wrap gap-1.5">
+      <span className="rounded bg-sky-100 px-1.5 font-mono text-sky-900">Call {line.call_id}</span>
+      <span className="rounded bg-slate-100 px-1.5 font-mono text-slate-900">Outcome {line.outcome ?? 'pending'}</span>
     </span>
   )
 }

@@ -2,18 +2,22 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
+import logging
+import time
 from contextlib import asynccontextmanager
 
-from fastapi import Body, FastAPI, HTTPException
+from fastapi import Body, FastAPI, HTTPException, Request
 
 from . import config
 from .audit import Audit, twist_log
 from .engine import RULES
 from .feeds import warmup
 from .gate import Assignment
-from .models import SOURCE_SPECS, SOURCES, STRENGTH, DecisionIn, JumpIn, LaneIn, SpeedIn
+from .models import CALL_OUTCOMES, SOURCE_SPECS, SOURCES, STRENGTH, CallIn, DecisionIn, JumpIn, LaneIn, SpeedIn
 from .scenario import EVENT_TYPES, BoxState, Scenario
 from .t49 import Poller
+from .voice import LIVE_GIVE_UP_SECONDS, OUTCOME_LABELS, POLL_SECONDS, Voice, default_outcome, spell_box
 from .timefmt import (
     format_offset,
     hours_between,
@@ -26,6 +30,8 @@ from .timefmt import (
     say_num,
 )
 
+log = logging.getLogger("rung.voice")
+
 LEGEND = {
     "live": "Live from Terminal49",
     "simulated": "Simulated by the Pier 7 scenario",
@@ -33,17 +39,44 @@ LEGEND = {
 
 scenario = Scenario(audit=Audit(config.AUDIT_PATH))
 poller = Poller(scenario.apply_live)
+voice = Voice()
+
+
+def sync_call(number: str, call: dict) -> None:
+    """Pull the transcript and, once it exists, the analysis for one call, then apply it."""
+    if not call["mock"] and time.time() - call["started_wall"] > LIVE_GIVE_UP_SECONDS:
+        if call["outcome"] is None:
+            note = "No analysis from Retell after 15 minutes."
+            scenario.record_call(number, call["call_id"], {"outcome": "unknown", "callback_needed": True, "notes": note}, "timeout")
+        scenario.call_update(number, call["call_id"], "ended", [])
+        return
+    got = voice.retrieve(call["call_id"], call["mock"])
+    scenario.call_update(number, call["call_id"], got["status"], got["transcript"])
+    if got["analysis"]:
+        scenario.record_call(number, call["call_id"], got["analysis"], "call_analysis")
+
+
+async def poll_calls() -> None:
+    while True:
+        for number, call in scenario.active_calls():
+            try:
+                await asyncio.to_thread(sync_call, number, call)
+            except Exception as exc:  # one bad call must not stop the poller
+                log.warning("Call %s poll failed: %s", call["call_id"], exc)
+        await asyncio.sleep(POLL_SECONDS)
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    task = asyncio.create_task(poller.run())
+    tasks = [asyncio.create_task(poller.run()), asyncio.create_task(poll_calls())]
     try:
         yield
     finally:
-        task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await task
+        for task in tasks:
+            task.cancel()
+        for task in tasks:
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
 
 
 app = FastAPI(title="Rung", lifespan=lifespan)
@@ -76,7 +109,17 @@ def state_payload() -> dict:
         ),
         "event_log": sc.event_log[-10:][::-1],
         "resets": sc.resets,
+        "voice": voice.status(),
     }
+
+
+def call_payload(state: BoxState) -> dict | None:
+    call = state.call
+    if not call:
+        return None
+    out = {k: v for k, v in call.items() if k != "started_wall"}
+    out["outcome_label"] = OUTCOME_LABELS.get(call["outcome"]) if call["outcome"] else None
+    return out
 
 
 def badge(state: BoxState, name: str) -> str | None:
@@ -194,6 +237,10 @@ def get_queue(carrier: str = "", step: str = "") -> list[dict]:
 
 @app.get("/api/box/{number}")
 def get_box(number: str) -> dict:
+    state = scenario.boxes.get(number)
+    if state and state.call and state.call["mock"] and scenario.call_active(number):
+        # A mock call costs nothing to read, so the card gets each line without waiting for the poller.
+        sync_call(number, dict(state.call))
     with scenario.lock:
         scenario.advance()
         state = scenario.boxes.get(number)
@@ -253,7 +300,14 @@ def get_box(number: str) -> dict:
             "clocks": clocks(state, scenario.gate_plan()[1]),
             "warmup": warmup(state.reefer_model, scenario.now) if state.reefer_model else None,
             "history": scenario.audit.lines(box=number),
-            "call": None,
+            "call": call_payload(state),
+            "ask": {
+                "available": state.released_at is None,
+                "mode": voice.mode,
+                "default_outcome": default_outcome(state.weight_case),
+                "outcomes": [{"id": o, "label": OUTCOME_LABELS[o]} for o in CALL_OUTCOMES],
+                "weight_case": state.weight_case,
+            },
         }
 
 
@@ -368,6 +422,105 @@ def post_gate_lanes(body: LaneIn) -> dict:
         raise HTTPException(400, str(exc))
     with scenario.lock:
         return gate_payload()
+
+
+@app.post("/api/call/{number}")
+def post_call(number: str, body: CallIn | None = None) -> dict:
+    number = number.strip().upper()
+    if number not in scenario.boxes:
+        raise HTTPException(404, f"Box {number} not found.")
+    if scenario.call_active(number):
+        raise HTTPException(409, "A call for this box is already running.")
+    try:
+        variables, phone = scenario.call_variables(number)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc))
+    outcome = (body.mock_outcome if body else None) or default_outcome(scenario.boxes[number].weight_case)
+    try:
+        info = voice.start(variables, {"box": number}, phone, outcome)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc))
+    except Exception as exc:
+        raise HTTPException(502, f"Retell refused the call: {exc}")
+    scenario.call_started(number, info, variables)
+    return {"call_id": info["call_id"], "access_token": info["access_token"], "mode": info["mode"], "mock": info["mock"]}
+
+
+STEP_SPOKEN = {
+    "RELEASE": "is ready to go at its slot",
+    "WATCH": "is not ready yet. We check it again at the next update",
+    "ASK": "needs fresher information before it can go",
+    "SLOW": "will go later or in another lane",
+    "HOLD": "is on hold",
+    "HAND": "is with a planner right now",
+}
+
+
+def lookup_text(number: str) -> str:
+    state = scenario.boxes.get(number)
+    if state is None:
+        return f"I could not find container {spell_box(number)}. Please check the number and try again."
+    if state.released_at:
+        return f"Container {spell_box(number)} has been released at the gate."
+    eff = scenario.effective(state)
+    parts = [f"Container {spell_box(number)} {STEP_SPOKEN[eff['step']]}."]
+    if eff["step"] == "HOLD" and eff["owner"]:
+        parts.append(f"The {eff['owner']} has to clear it.")
+    appt = state.appointment
+    if appt:
+        parts.append(f"Your appointment is lane {appt['lane']} at {appt['window']}.")
+        planned = planned_slot(state, scenario.gate_plan()[1])
+        if planned and planned["lane"]:
+            parts.append(f"The plan for tonight moves you to lane {planned['lane']} at {planned['window']}.")
+        elif planned:
+            parts.append("There is no open slot for you tonight.")
+    return " ".join(parts)
+
+
+async def retell_body(request: Request) -> dict:
+    raw = (await request.body()).decode("utf-8")
+    if not voice.verify(raw, request.headers.get("x-retell-signature")):
+        raise HTTPException(401, "Retell signature did not verify.")
+    try:
+        body = json.loads(raw or "{}")
+    except json.JSONDecodeError:
+        raise HTTPException(400, "Body is not JSON.")
+    return body if isinstance(body, dict) else {}
+
+
+def box_from(body: dict) -> str:
+    args = body.get("args") if isinstance(body.get("args"), dict) else body
+    call = body.get("call") if isinstance(body.get("call"), dict) else {}
+    raw = args.get("container_number") or (call.get("metadata") or {}).get("box") or ""
+    return "".join(str(raw).split()).upper()
+
+
+@app.post("/api/retell/lookup")
+async def post_retell_lookup(request: Request) -> dict:
+    body = await retell_body(request)
+    number = box_from(body)
+    if not number:
+        return {"result": "Which container number are you asking about?"}
+    with scenario.lock:
+        scenario.advance()
+        return {"result": lookup_text(number)}
+
+
+@app.post("/api/retell/record")
+async def post_retell_record(request: Request) -> dict:
+    body = await retell_body(request)
+    number = box_from(body)
+    args = body.get("args") if isinstance(body.get("args"), dict) else body
+    call = body.get("call") if isinstance(body.get("call"), dict) else {}
+    if number not in scenario.boxes:
+        return {"result": "I could not find that container, so nothing was recorded."}
+    analysis = {
+        "outcome": args.get("outcome"),
+        "callback_needed": args.get("callback_needed"),
+        "notes": args.get("notes", ""),
+    }
+    eff = scenario.record_call(number, call.get("call_id") or args.get("call_id"), analysis, "record_function")
+    return {"result": f"Recorded. Container {spell_box(number)} {STEP_SPOKEN[eff['step']]}."}
 
 
 @app.get("/api/audit")

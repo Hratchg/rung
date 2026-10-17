@@ -47,6 +47,7 @@ export type State = {
   carriers: string[]
   scripted_events: ScenarioEvent[]
   powered_reefers: string[]
+  voice: { mode: 'mock' | 'web' | 'phone'; missing: string[]; phone_enabled: boolean }
 }
 
 export type Planner = {
@@ -164,7 +165,41 @@ export type AuditLine = {
   twist_tag: string | null
   action?: string
   effect?: string
+  call_id?: string
+  outcome?: CallOutcome | null
+  callback_needed?: boolean
 }
+
+export type CallOutcome = 'confirmed_empty' | 'confirmed_loaded' | 'reschedule_accepted' | 'unknown'
+
+export type TranscriptLine = { role: 'agent' | 'trucker'; content: string }
+
+export type CallInfo = {
+  call_id: string
+  mode: 'web' | 'phone'
+  mock: boolean
+  status: string
+  started_at: string
+  trucker_name: string
+  dray_carrier: string
+  transcript: TranscriptLine[]
+  outcome: CallOutcome | null
+  outcome_label: string | null
+  callback_needed: boolean | null
+  notes: string
+  source: string | null
+  recorded_at: string | null
+}
+
+export type AskInfo = {
+  available: boolean
+  mode: 'mock' | 'web' | 'phone'
+  default_outcome: CallOutcome
+  outcomes: { id: CallOutcome; label: string }[]
+  weight_case: string | null
+}
+
+export type CallStart = { call_id: string; access_token: string | null; mode: 'web' | 'phone'; mock: boolean }
 
 export type BoxDetail = {
   number: string
@@ -180,7 +215,8 @@ export type BoxDetail = {
   clocks: Clocks
   warmup: Warmup | null
   history: AuditLine[]
-  call: unknown
+  call: CallInfo | null
+  ask: AskInfo
 }
 
 export type TwistAdded = { kind: string; id: string | null; name: string; file: string; created_at: string | null }
@@ -320,6 +356,15 @@ function useRefreshAll() {
 export function useDecision() {
   const refresh = useRefreshAll()
   return useMutation({ mutationFn: (body: DecisionBody) => post('/api/decision', body), onSuccess: refresh })
+}
+
+export function useStartCall(number: string) {
+  const refresh = useRefreshAll()
+  return useMutation({
+    mutationFn: (mock_outcome: CallOutcome | null) =>
+      post<CallStart>(`/api/call/${encodeURIComponent(number)}`, mock_outcome ? { mock_outcome } : {}),
+    onSuccess: refresh,
+  })
 }
 
 export function useLaneToggle() {

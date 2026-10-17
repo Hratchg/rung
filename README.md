@@ -6,15 +6,17 @@ conflicts between sources, and recommends the gentlest step on a ladder:
 RELEASE, WATCH, ASK, SLOW, HOLD, and HAND. The planner approves or overrides every hold or release,
 and every decision is written to an audit log.
 
-Status: Phase 3 (Slow Lane) is built: the queue, the box card, the audit and twist panels, and the
-gate re-slotting optimizer with its Gate screen. Voice calls come in Phase 4.
+Status: Phase 4 (Ask Call) is built: the queue, the box card with the Ask call, the audit and twist
+panels, and the gate re-slotting optimizer with its Gate screen. With no Retell key the Ask call
+runs as a scripted simulated web call.
 
 ## Screens
 
 | Screen | How to get there | What it shows |
 | --- | --- | --- |
 | Queue | `#/`, the Queue tab | Every waiting box grouped by step, with Approve and Override per row |
-| Box card | Click a box number, or open `#/box/MSKU1234567` | Five source panels with trust bars (hover for the trust reason), conflicts with both values, fired rules with their step, the reason, decision history, and on Harbor Night the reefer warm up clock |
+| Box card | Click a box number, or open `#/box/MSKU1234567` | Five source panels with trust bars (hover for the trust reason), conflicts with both values, fired rules with their step, the reason, the Ask call with its transcript and outcome, decision history, and on Harbor Night the reefer warm up clock |
+| Gate | `#/gate`, the Gate tab | Lanes by windows with appointment chips (R reefer, L last free day today, M moved), a Close or Open toggle per lane, the moved and overflow lists, solve time and solver name, and Rung against closing the terminal |
 | Audit log panel | Audit log tab, or Open in audit log on a box card | Audit lines newest first, filter by box |
 | Twist log panel | Twist log tab | Each twist tag, when it was received, what was added, and when it merged |
 
@@ -53,22 +55,60 @@ curl -X POST localhost:8000/api/scenario/reset
 curl -X POST localhost:8000/api/scenario/speed -H 'Content-Type: application/json' -d '{"minutes_per_second": 0}'
 curl -X POST localhost:8000/api/scenario/jump  -H 'Content-Type: application/json' -d '{"t": "+00:40"}'
 curl -X POST localhost:8000/api/scenario/event -H 'Content-Type: application/json' -d '{"type": "reefer_power_off", "box": "MSKU1234567"}'
+curl localhost:8000/api/gate
+curl -X POST localhost:8000/api/gate/lanes     -H 'Content-Type: application/json' -d '{"lane": 4, "open": false}'
 ```
+
+## Gate optimizer
+
+`backend/gate.py` places every open booking into slot units, one per lane, window, and truck, over
+open lanes only. Cost is delay hours times (101 minus urgency), plus a flat 1e6 penalty for a window
+earlier than the booking, a HOLD box, or a closed lane. Pairs that carry the penalty are dropped, so a
+box with no feasible unit lands in overflow, ordered by urgency. Reefers and boxes at or past their
+last free day are solved first, so they keep a slot whenever one exists. If scipy fails, a greedy
+urgency sort takes over and the Gate screen says so. Approving SLOW on a box books it into its planned slot.
+
+## Ask call
+
+The Ask button on a box card calls `POST /api/call/{number}` to ask the trucker about a weight
+conflict. Try it on the heavy box `CMAU9939083`, whose manifest says 36,000 lb against 40,500 lb on the scale.
+A poller reads the call every 3 seconds, and the outcome re-evaluates the box:
+
+| Outcome | Effect |
+| --- | --- |
+| `confirmed_empty` | The trucker backs the manifest. C1 clears and carrier trust rises by 0.20 |
+| `confirmed_loaded` | The trucker backs the scale. Weighbridge trust rises by 0.20 and rule R12 sends the box to HAND |
+| `reschedule_accepted` | The trucker takes a later slot. C1 stays open and R12 votes SLOW |
+| `unknown` | C1 stays open and R12 votes HOLD, owner shipping line |
+
+Every call writes a `voice` audit line with the call id when it starts, and another with the call id and outcome when it ends.
+
+| Keys set in `.env` | What runs |
+| --- | --- |
+| None | Simulated web call. A scripted transcript plays line by line, and a picker on the card sets the trucker answer |
+| `RETELL_API_KEY`, `RETELL_AGENT_ID` | `create_web_call` with the six dynamic variables as strings and the box number in metadata. The browser joins with `retell-client-js-sdk` using the access token |
+| plus `RETELL_FROM_NUMBER` and `RETELL_PHONE_ENABLED=true` | `create_phone_call` from that number to the trucker phone on the appointment |
+| plus `PUBLIC_BASE_URL` from `make tunnel` | Retell can reach the custom functions `POST /api/retell/lookup` (inbound, "is my box ready") and `POST /api/retell/record` (outbound outcome). Both check `x-retell-signature` with `retell.verify` when a key is set |
+
+The Retell agent "Pier 7 gate desk" needs a post call analysis with the fields `outcome`
+(confirmed_empty, confirmed_loaded, reschedule_accepted, unknown), `callback_needed`, and `notes`.
 
 ## Layout
 
 | Path | What it holds |
 | --- | --- |
 | `backend/engine.py` | Pure `evaluate(box, now)`: trust, conflicts C1 to C5, urgency, rule firing, reason strings |
-| `backend/rules/` | One file per rule, R0 to R11, each with a module level `RULE` and `created_at` |
+| `backend/rules/` | One file per rule, R0 to R12, each with a module level `RULE` and `created_at`. R12 applies the Ask call outcome |
 | `backend/scenario.py` | Loads `scenario.json`, builds the seeded synthetic population, scenario clock, events, planner actions |
 | `backend/feeds.py` | Simulated reefer telemetry and weighbridge readings |
 | `backend/t49.py` | Terminal49 poller with fixture fallback |
+| `backend/voice.py` | Retell web and phone calls, the call poller shape, signature checks, and the scripted mock call |
+| `backend/gate.py` | Pure `solve()` for gate re-slotting with `scipy.optimize.linear_sum_assignment` and a greedy fallback |
 | `backend/audit.py` | `audit.jsonl` writer and a 5000 line ring buffer |
 | `backend/main.py` | FastAPI routes, serves `frontend/dist` from the same origin |
 | `twists.json` | Twist log. One entry per merged TWIST: tag, text, received and merged times, files added |
-| `frontend/src/` | Vite, React, TypeScript, Tailwind, TanStack Query. `App.tsx` header and hash routes, `Queue.tsx`, `BoxCard.tsx`, `Audit.tsx` panels, `Decide.tsx` approve and override |
-| `tests/` | Engine and API tests. `test_gate.py` is a placeholder until Phase 3 |
+| `frontend/src/` | Vite, React, TypeScript, Tailwind, TanStack Query. `App.tsx` header and hash routes, `Queue.tsx`, `BoxCard.tsx`, `AskCall.tsx`, `Gate.tsx`, `Audit.tsx` panels, `Decide.tsx` approve and override |
+| `tests/` | Engine, API, gate optimizer, and voice tests |
 
 ## Live versus simulated
 

@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useAudit, type AuditLine, type Twist } from './api'
-import { sayDateTime } from './format'
-import { StepChip } from './ui'
+import { ACTOR, sayDateTime } from './format'
+import { CallTags, StepChip } from './ui'
 
 const AUDIT_LIMIT = 100
 
@@ -93,9 +93,7 @@ function AuditItem({ line }: { line: AuditLine }) {
         <a href={`#/box/${line.box}`} className="font-mono font-semibold text-sky-900 underline underline-offset-4">
           {line.box}
         </a>
-        <span className={`font-semibold ${line.actor === 'planner' ? 'text-violet-800' : 'text-slate-700'}`}>
-          {line.actor === 'planner' ? 'Planner' : 'Engine'}
-        </span>
+        <span className={`font-semibold ${ACTOR[line.actor]?.tone ?? 'text-slate-700'}`}>{ACTOR[line.actor]?.label ?? 'Engine'}</span>
         <StepChip step={line.step} />
         {line.previous_step && line.previous_step !== line.step && <span className="text-slate-600">was {line.previous_step}</span>}
         {line.override && <span className="rounded bg-violet-100 px-1.5 font-semibold text-violet-900">Override true</span>}
@@ -106,6 +104,11 @@ function AuditItem({ line }: { line: AuditLine }) {
         Urgency {line.urgency}. Fired {line.fired.length ? line.fired.join(', ') : 'none'}. Conflicts {line.conflicts.length ? line.conflicts.join(', ') : 'none'}.
         {line.owner ? ` Owner: ${line.owner}.` : ''}
       </div>
+      {line.call_id && (
+        <div className="mt-1">
+          <CallTags line={line} />
+        </div>
+      )}
       {line.note && <div className="font-semibold">Note: {line.note}</div>}
       {line.effect && <div>{line.effect}</div>}
       <button type="button" onClick={() => setOpen(!open)} className={`mt-0.5 text-left text-slate-800 ${open ? '' : 'line-clamp-2'}`}>

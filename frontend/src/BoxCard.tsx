@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { SOURCE_NAMES, useBox, type AuditLine, type BoxDetail, type ConflictInfo, type SourceName, type Warmup } from './api'
+import AskCall from './AskCall'
 import { OverrideDialog, PlannerActions } from './Decide'
-import { SOURCE_FIELDS, SOURCE_TITLE, STEP_META, sayDateTime, sayHours, sayNum, sayTime, sayValue } from './format'
+import { ACTOR, SOURCE_FIELDS, SOURCE_TITLE, STEP_META, sayDateTime, sayHours, sayNum, sayTime, sayValue } from './format'
 import { Notice } from './Queue'
-import { BadgeChip, StepChip, TrustBar, UrgencyBar } from './ui'
+import { BadgeChip, CallTags, StepChip, TrustBar, UrgencyBar } from './ui'
 
 const CONFLICT_NAMES: Record<string, string> = {
   C1: 'Weight',
@@ -92,6 +93,8 @@ export default function BoxCard({ number, onAudit }: { number: string; onAudit: 
         </div>
         <p className="mt-3 text-xl leading-snug">{d.reason}</p>
       </section>
+
+      <AskCall box={b} />
 
       <section className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5" aria-label="Sources">
         {SOURCE_NAMES.map((name) => (
@@ -250,15 +253,14 @@ function History({ lines, onAudit }: { lines: AuditLine[]; onAudit: () => void }
           {lines.map((line) => (
             <li key={line.seq} className="flex flex-wrap items-start gap-x-3 gap-y-1 py-2">
               <span className="w-28 shrink-0 font-semibold tabular-nums">{sayDateTime(line.ts)}</span>
-              <span className={`w-20 shrink-0 font-semibold ${line.actor === 'planner' ? 'text-violet-800' : 'text-slate-700'}`}>
-                {line.actor === 'planner' ? 'Planner' : 'Engine'}
-              </span>
+              <span className={`w-20 shrink-0 font-semibold ${ACTOR[line.actor]?.tone ?? 'text-slate-700'}`}>{ACTOR[line.actor]?.label ?? 'Engine'}</span>
               <span className="flex w-60 shrink-0 flex-wrap items-center gap-1.5">
                 <StepChip step={line.step} />
                 {line.previous_step && line.previous_step !== line.step && <span className="text-slate-600">was {line.previous_step}</span>}
                 {line.override && <span className="rounded bg-violet-100 px-1.5 font-semibold text-violet-900">Override</span>}
               </span>
               <span className="min-w-0 flex-1">
+                {line.call_id && <CallTags line={line} />}
                 {line.note && <span className="block font-semibold">Note: {line.note}</span>}
                 {line.effect && <span className="block">{line.effect}</span>}
                 <span className="block text-slate-700">{line.reason}</span>

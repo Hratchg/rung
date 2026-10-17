@@ -35,3 +35,17 @@ One entry per phase. Each entry says what the assistant produced and what a huma
 - It built `Gate.tsx` with the lanes by windows grid, lane toggles, moved and overflow lists, the solver chip, and the comparison against a closed terminal.
 - It wrote 14 gate tests. The suite has 58 tests.
 - Human check: the spec cost weight (101 minus urgency) makes delay cheaper for urgent boxes. The priority tier keeps reefers and last free day boxes whole, but inside a tier urgent boxes are the ones pushed later.
+
+## Entry 5. Phase 4, Ask Call
+
+- Asked the assistant to build the Retell ask call, the custom functions, and the Ask button on the box card, with a mock path because no Retell key is available.
+- It wrote `backend/voice.py`:
+  - `create_web_call` with the six dynamic variables as strings and the box in metadata.
+  - `create_phone_call` only when `RETELL_FROM_NUMBER` is set and `RETELL_PHONE_ENABLED` is true.
+  - `retrieve` normalized into a transcript and an outcome, and `retell.verify` on custom function bodies.
+  - A scripted mock call that unfolds line by line in real seconds.
+- It added the outcome to the engine input. `confirmed_empty` clears C1 and lifts carrier trust, `confirmed_loaded` lifts weighbridge trust, and a new rule file R12 maps the remaining outcomes to HAND, HOLD, or SLOW.
+- It added `POST /api/call/{number}`, `POST /api/retell/lookup`, and `POST /api/retell/record`, a 3 second call poller, and `voice` audit lines with the call id and outcome.
+- It built `AskCall.tsx`, which runs a live web call through `retell-client-js-sdk` or plays the simulated call, plus call tags in the history and audit panel.
+- It wrote 13 voice tests. The suite has 71 tests.
+- Human check: create the "Pier 7 gate desk" agent in Retell with the post call analysis fields, then run one real web call. That path is tested only against a fake client.
