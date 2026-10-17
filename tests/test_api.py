@@ -293,3 +293,14 @@ def test_twist_log_joins_twist_file_and_tagged_rule_files(tmp_path):
     merged = rows["twist-2"]
     assert merged["status"] == "merged" and merged["merged_at"] == "2026-10-17T15:20:00+00:00"
     assert merged["added"] == [{"kind": "rule", "id": "R12", "name": "chassis", "file": "backend/rules/r12_chassis.py", "created_at": "2026-10-17T15:18:00+00:00"}]
+
+
+def test_prompts_show_the_retell_prompt_the_setup_script_sends(client):
+    from scripts import retell_setup
+
+    retell = client.get("/api/prompts").json()["retell"]
+    assert retell["prompt"] == retell_setup.prompt(True)
+    assert retell["agent_name"] == "Pier 7 gate desk" and retell["source"] == "scripts/retell_setup.py"
+    assert [t["name"] for t in retell["tools"]] == ["lookup_box", "record_outcome", "end_call"]
+    assert [a["name"] for a in retell["analysis"]] == ["outcome", "callback_needed", "notes"]
+    assert "rung.example" not in json.dumps(retell) and retell["functions_live"] is False

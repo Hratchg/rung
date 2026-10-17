@@ -688,6 +688,26 @@ async def post_retell_record(request: Request) -> dict:
     return {"result": f"Recorded. Container {spell_box(number)} {STEP_SPOKEN[eff['step']]}."}
 
 
+@app.get("/api/prompts")
+def get_prompts() -> dict:
+    """The prompt and settings scripts/retell_setup.py sends to Retell, read from that script so they never drift."""
+    from scripts import retell_setup
+
+    llm = retell_setup.llm_args("https://rung.example")
+    return {
+        "retell": {
+            "agent_name": retell_setup.AGENT_NAME,
+            "source": "scripts/retell_setup.py",
+            "prompt": llm["general_prompt"],
+            "temperature": llm["model_temperature"],
+            "variables": list(retell_setup.VARIABLES),
+            "tools": [{"name": t["name"], "description": t["description"]} for t in llm["general_tools"]],
+            "analysis": [{"name": a["name"], "description": a["description"]} for a in retell_setup.ANALYSIS],
+            "functions_live": bool(voice.settings.public_base_url),
+        },
+    }
+
+
 @app.get("/api/audit")
 def get_audit(since: str = "", box: str = "", limit: int = 0, diff: bool = False) -> dict:
     git = twist_diffs.commits()

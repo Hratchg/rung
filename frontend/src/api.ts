@@ -46,6 +46,7 @@ export type State = {
   poller: Poller
   carriers: string[]
   scripted_events: ScenarioEvent[]
+  event_log: ScenarioEvent[]
   powered_reefers: string[]
   reefers: { number: string; circuit: string | null; power_on: boolean; silent: boolean }[]
   voice: { mode: 'mock' | 'web' | 'phone'; missing: string[]; phone_enabled: boolean }
@@ -414,7 +415,30 @@ export function useBox(number: string) {
   })
 }
 
-export function useAudit(filters: { box: string; limit: number; diff?: boolean }) {
+export type Prompts = {
+  retell: {
+    agent_name: string
+    source: string
+    prompt: string
+    temperature: number
+    variables: string[]
+    tools: { name: string; description: string }[]
+    analysis: { name: string; description: string }[]
+    functions_live: boolean
+  }
+}
+
+export function usePrompts(enabled: boolean) {
+  return useQuery({
+    queryKey: ['prompts'],
+    queryFn: () => request<Prompts>('/api/prompts'),
+    enabled,
+    staleTime: Infinity,
+    refetchInterval: false,
+  })
+}
+
+export function useAudit(filters: { box: string; limit: number; diff?: boolean }, enabled = true) {
   const params = new URLSearchParams({ limit: String(filters.limit) })
   if (filters.box) params.set('box', filters.box)
   if (filters.diff) params.set('diff', 'true')
@@ -422,6 +446,7 @@ export function useAudit(filters: { box: string; limit: number; diff?: boolean }
     queryKey: ['audit', filters],
     queryFn: () => request<AuditPayload>(`/api/audit?${params.toString()}`),
     placeholderData: (previous) => previous,
+    enabled,
   })
 }
 

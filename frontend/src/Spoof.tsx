@@ -51,21 +51,18 @@ export default function SpoofForm({ box }: { box: BoxDetail }) {
     if (weightOk) spoof.mutate({ weight_in_lbs: parsed }, { onSuccess: () => setWeight('') })
   }
 
-  const field = 'rounded border border-slate-400 bg-white px-2 py-1 text-base'
-  const button = 'rounded-md border border-fuchsia-700 px-3 py-1 font-semibold text-fuchsia-900 hover:bg-fuchsia-100 disabled:opacity-50'
+  const field = 'h-10 rounded-lg border border-slate-400 bg-white px-2 text-base'
+  const button = 'h-10 rounded-lg border border-fuchsia-700 bg-white px-3 font-semibold text-fuchsia-900 hover:bg-fuchsia-100 disabled:opacity-50'
   return (
-    <section className="mt-3 rounded-lg border-2 border-dashed border-fuchsia-400 bg-fuchsia-50/60 p-4" aria-label="Spoof input">
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h3 className="text-lg font-bold">Spoof input</h3>
-        <span className="text-slate-700">For judges. Fake a reading and Rung re-evaluates the box at once. Each spoof writes an audit line.</span>
-      </div>
+    <div>
+      <p className="text-slate-700">Fake a reading and Rung evaluates the box again at once. Each spoof writes an audit line.</p>
       {!info.available ? (
         <p className="mt-2 text-slate-700">The box has left the terminal. There is nothing left to spoof.</p>
       ) : (
         <div className="mt-2 flex flex-wrap items-end gap-x-6 gap-y-3">
           <form onSubmit={sendWeight} className="flex flex-wrap items-end gap-2">
             <label className="flex flex-col">
-              <span className="text-base text-slate-600">Carrier weight in lb</span>
+              <span className="text-slate-700">Carrier weight in lb</span>
               <input
                 inputMode="numeric"
                 className={`${field} w-44 tabular-nums`}
@@ -81,7 +78,7 @@ export default function SpoofForm({ box }: { box: BoxDetail }) {
           </form>
           <div className="flex flex-wrap items-end gap-2">
             <label className="flex flex-col">
-              <span className="text-base text-slate-600">Hold</span>
+              <span className="text-slate-700">Hold</span>
               <select className={field} value={hold} onChange={(e) => setHold(e.target.value as SpoofHoldName)}>
                 {info.holds.map((h) => (
                   <option key={h.name} value={h.name}>
@@ -105,6 +102,6 @@ export default function SpoofForm({ box }: { box: BoxDetail }) {
       {typed && !weightOk && <p className="mt-2 text-red-800">Type a whole number of pounds from 0 to 150,000.</p>}
       {spoof.error && <p className="mt-2 rounded bg-red-100 px-3 py-2 text-red-900">{spoof.error.message}</p>}
       {spoof.data && <ResultLine result={spoof.data} />}
-    </section>
+    </div>
   )
 }
