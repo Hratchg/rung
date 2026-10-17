@@ -23,14 +23,26 @@ them runs live today.
 
 Every field in the UI carries a badge, live or simulated, so the screen never hides which is which.
 
+## Reading the screen
+
+The UI is built to be read from across a room at 1280 by 720. Every status color comes with a text
+label, and rule and conflict ids such as R3 or C1 stay as secondary detail behind plain words.
+
+- **Header**, in three rows. The first says where you are: Rung, Gate triage at Pier 7, the night (Tuesday or Harbor Night), the scenario clock, lanes open, and the three screens, **Queue**, **Gate plan**, and **Audit log**. The second row is **Tonight so far**: Released, Reefers powered, Reefers lost, Fees avoided, and Bookings kept. The third shows the latest scenario event on the left and where the data comes from on the right. A red banner sits above it while a feed is dark.
+- **Queue**. The headline counts the boxes that need a decision. Under it the ladder strip shows the six steps gentlest first, each with its count and a short meaning, and Hand set apart on the right. Click a step to filter. **How the ladder works** explains every step and how the votes are counted. Each row leads with plain words such as Weight mismatch or Hold by customs broker, and has one main button named for the action.
+- **Box card**. The big card says what Rung recommends, the next step in one sentence, the owner, the urgency, and where the step sits on the ladder, with **Your move** on the right. The call panel and the reefer card follow when they matter, then **Why Rung says** with the rule votes next to **Where the sources disagree**. Sources and trust, the full reason, the decision history, and the demo spoof form stay collapsed until opened.
+- **Gate plan**. The headline compares Rung against closing the terminal. The lanes by hour grid follows with an icon key, then **Moved to a new slot** and **No slot tonight**.
+- **Demo controls**. A dashed amber dock at the bottom holds everything that drives the scenario: **Reset**, **Minutes per second**, the next scripted event, **Voice agent prompt**, and **More controls** with the event buttons, reefer faults, rated orders, the scripted timeline, and the twist log. None of it is part of the planner's app.
+
 ## Architecture
 
 One process on one port. FastAPI serves the JSON API and the built Vite app from the same origin, so
 there is no CORS setup and no second server in the demo.
 
 ```
-Browser: React, TypeScript, Tailwind, TanStack Query
+Browser: React, TypeScript, Tailwind, TanStack Query, shadcn/ui on Radix
   polls GET /api/state, /api/queue, /api/box, /api/gate, /api/audit every 2 seconds
+  reads GET /api/prompts once, when the voice agent prompt drawer opens
         |
         |  same origin
         v
@@ -55,7 +67,7 @@ Retell voice agent "Pier 7 gate desk", through PUBLIC_BASE_URL (a cloudflared qu
 ## The scenario
 
 The clock starts at 22:00 on Oct 18 and runs one scenario minute per real second by default. The
-header speed picker offers Paused, 1, 2, 5, and 10 minutes per second.
+**Minutes per second** buttons in the Demo controls dock offer Pause, 1, 2, 5, and 10.
 
 The yard holds 191 boxes: the one hand written Harbor Night box `MSKU1234567` from the spec, plus 190
 synthetic boxes. The synthetic boxes have valid ISO 6346 numbers, 15 percent are reefers (frozen at
@@ -76,9 +88,9 @@ Scripted events, as offsets from 22:00:
 | `+00:40` | `source_dark terminal` | The terminal feed goes dark. The dark feed banner appears |
 | `+01:00` | `twist` | A placeholder for a hackathon twist |
 
-The header buttons fire the same events by hand: Close lanes 4 to 6, Hold TCLU7654321, the reefer
-picker with Cut power, Trip circuit, Drop telemetry, and Fail the unit, and Terminal feed dark. The
-same controls exist as API calls:
+**More controls** in the Demo controls dock fires the same events by hand: Close lanes 4 to 6,
+Customs hold on TCLU7654321, Cut terminal feed, and the **Reefer fault** picker with Cut power, Trip
+circuit, Drop telemetry, and Fail the unit. The same controls exist as API calls:
 
 ```bash
 curl -X POST localhost:8000/api/scenario/reset
@@ -110,8 +122,8 @@ trust = base × 0.5 ^ (age_hours / half_life_hours) × 0.7 ^ (conflicts this sou
 ```
 
 So trust fades as a reading ages, and drops by 30 percent for every conflict the source is caught in.
-If a trucker call backs one side of a weight conflict, that source gains 0.20, capped at 0.99. Hover a
-trust bar on the box card to see the arithmetic, for example "terminal: base 0.85, age 11 min,
+If a trucker call backs one side of a weight conflict, that source gains 0.20, capped at 0.99. Open
+**Sources and trust** on the box card and hover a trust bar to see the arithmetic, for example "terminal: base 0.85, age 11 min,
 freshness 0.97, 1 conflict, trust 0.58". The bar also has a text level: None, Low under 0.3, Medium
 under 0.6, High otherwise.
 
@@ -206,16 +218,20 @@ no urgency gate. A clean, available box releases at any urgency and still sorts 
 ## HAND, planner actions, and the audit log
 
 The hand flag means a planner must tap before the gate acts. It is set when any fired rule says HAND,
-when the step is HOLD, or when the step is RELEASE after a conflict or a trucker call. The box card
-shows "Planner tap" next to the step.
+when the step is HOLD, or when the step is RELEASE after a conflict or a trucker call. The queue row
+and the box card show a violet **Needs you** chip.
+
+Every row and every box card has one main button, named for what it does, plus **Change step**.
 
 | Button | When | What it does |
 | --- | --- | --- |
-| Release | Step RELEASE | Gates the box out. It leaves the queue and counts toward Released and Demurrage avoided |
-| Approve | Step WATCH, SLOW, or HOLD | Confirms the engine. Approving SLOW books the box into the slot the optimizer planned |
-| Run ask | Step ASK | Re-polls the terminal for C2, sends a reweigh request for C1, or asks the reefer crew for R14 |
+| Release truck | Step RELEASE | Gates the box out. It leaves the queue and counts toward Released and Fees avoided |
+| Keep watching | Step WATCH | Confirms the engine. Nothing happens at the gate yet |
+| Book new slot | Step SLOW | Books the box into the slot the optimizer planned |
+| Confirm hold | Step HOLD | Confirms the engine. The truck stays at the gate until the owner clears the hold |
+| Pull fresh record, Request reweigh, Alert reefer crew | Step ASK | Re-polls the terminal for C2, sends a reweigh request for C1, or asks the reefer crew for R14 |
 | Decide | Step HAND | Opens the step picker. HAND has no default, so a person must choose |
-| Override | Any step | Pick a different step and leave a note |
+| Change step | Any step | Pick a different step and leave a note for the audit log |
 
 Every decision change is one JSON line in `audit.jsonl` and in a 5000 line ring buffer:
 
@@ -247,14 +263,15 @@ newest first with a box filter, and each box card shows its own history.
 - If scipy fails, a greedy urgency sort takes over and the Gate screen says so.
 
 At `+00:10`, with lanes 4 to 6 closed, it moves 47 trucks and overflows 20 in under 1 ms. The target
-was 100 ms. The Gate screen compares Rung against the blunt move of closing the terminal: appointments
-kept (96 of 129 against 0), reefers kept, last free day boxes kept, throughput, released so far, and
-reefers past the loss limit.
+was 100 ms. The headline of the Gate plan screen compares Rung against the blunt move of closing the
+terminal, for example "Lanes 4 to 6 are closed. Rung keeps 96 of 129 trucks moving." Three cards under
+it show trucks kept on the gate plan (96 of 129 against 0), reefers kept, and last free day boxes kept,
+and a line below them compares bookings kept, released so far, and reefers lost.
 
 ## The ask call
 
-ASK on a weight conflict means: call the trucker. The Ask button on the box card starts it, and it is
-built to try on `CMAU9939083`.
+ASK on a weight conflict means: call the trucker. **Call the trucker** on the box card starts it, and
+it is built to try on `CMAU9939083`.
 
 1. `POST /api/call/{number}` calls Retell `create_web_call` with the agent id, six dynamic variables as strings (container number, manifest and measured weight, appointment time, trucker name, dray carrier), and the box number in metadata. With `RETELL_FROM_NUMBER` set and `RETELL_PHONE_ENABLED=true` it calls `create_phone_call` to the trucker phone instead.
 2. The browser joins the web call with `retell-client-js-sdk`, using the access token, transport, and ICE servers the call returns.
@@ -272,28 +289,34 @@ built to try on `CMAU9939083`.
 Each call writes a `voice` audit line with the call id when it starts and another with the call id
 and outcome when it ends.
 
-With no Retell key, the same button plays a scripted simulated call line by line, and a picker on the
-card sets the trucker's answer. The inbound job, a trucker calling to ask whether a box is ready,
+With no Retell key, the same button plays a scripted simulated call line by line, and the dashed Demo
+picker **The simulated trucker answers** sets the trucker's answer. The inbound job, a trucker calling to ask whether a box is ready,
 uses `lookup_box` too, but it needs a phone number bought in Retell.
 
 `make retell-setup` builds the LLM and the agent from code: the prompt for both jobs, the two custom
 functions plus `end_call`, and the post call analysis fields `outcome`, `callback_needed`, and `notes`.
 
+**See the agent prompt** on the box card, or **Voice agent prompt** in the Demo controls dock, opens a
+drawer with that prompt, the six values filled in for each call, the tools, and the analysis fields.
+It reads `GET /api/prompts`, which imports `scripts/retell_setup.py` and returns what the script sends
+when a public URL is set, so the drawer and the agent cannot drift apart. No keys or URLs are in the
+response.
+
 ## Phase 5 features
 
 ### Dark feed banner
 
-A red banner under the header reads "Terminal feed dark, N min" while a `source_dark` event is in
+A red banner in the header reads "Terminal feed dark, N min" while a `source_dark` event is in
 force, counted in scenario minutes. It also shows while the Terminal49 poller is failing, because the
 key was rejected or the API is unreachable, counted in real minutes. The queue keeps running from the
 last snapshot: boxes that depend on the dark feed WATCH, and trucks due at the gate go to HAND.
 
 Fixture mode is not a failure. With no key, or a key that can only create tracking requests, the
-header chip says so calmly and no banner shows.
+data source chip at the right of the latest event line reads "All data simulated" and no banner shows.
 
 ### Spoof input
 
-For judges. On any box card, type a fake carrier weight, or place or clear a customs, USDA, VACIS,
+For judges. In **Demo: fake a reading** at the bottom of any box card, type a fake carrier weight, or place or clear a customs, USDA, VACIS,
 line, freight, or TMF hold. The engine re-evaluates at once, the trust bars move, and the card shows
 the step and trust before and after. Each spoof writes a `spoof` audit line. Try 41,000 lb on
 `MSKU5027648`, a 31,470 lb dry box: C1 fires, carrier trust drops from 0.72 to 0.52, and the step goes
@@ -301,11 +324,11 @@ from RELEASE to ASK. Or place a customs hold on `CMAU9939083`.
 
 ### Rated order mode
 
-The "Rated orders" switch in the header marks the six boxes listed under `rated_orders` in
+The **Rated orders** switch under **More controls** in the Demo controls dock marks the six boxes listed under `rated_orders` in
 `scenario.json` with a gate out deadline of 03:00. While it is on, they gain 50 urgency and R13 votes
 RELEASE with a pin, through the same ladder, so a safety vote such as ASK on a weight conflict still
 wins. On the gate they are solved first and may not take a window that starts after 02:00. Boxes
-that lost their slot to them show as Slid at the top of overflow, with the slot they would have had.
+that lost their slot to them show as Slid at the top of **No slot tonight**, with the slot they would have had.
 With lanes 4 to 6 down, five boxes slide.
 
 ### Silent reefer classifier
@@ -320,7 +343,8 @@ and R14 asks the right people:
 | Failed | An alarm, or a draw outside 2 to 8 kW, before the silence | Send a reefer technician to inspect the unit now |
 | Telemetry | A single unit went quiet after a normal draw | The unit is probably still cooling. Get a manual temperature read |
 
-Use the header reefer picker to Trip circuit, Fail the unit, or Drop telemetry on any powered reefer.
+Use **Reefer fault** under **More controls** to Trip circuit, Fail the unit, or Drop telemetry on any
+powered reefer.
 On Harbor Night the reefer panel also shows a warm up clock: when the product passes its loss limit,
 on the model curve. Frozen cargo follows the CSIRO 2007 figure, about 19 h from minus 18 C to minus
 10 C with the power off. Chilled and produce use a 6 h time constant, labeled on the card as an
@@ -329,7 +353,7 @@ assumption.
 ### Twist diff
 
 During the hackathon, a message starting with TWIST adds one new rule, event type, or source. Each
-twist is recorded in `twists.json` and committed as `twist: <tag>`. The Twist log tab lists each tag,
+twist is recorded in `twists.json` and committed as `twist: <tag>`. The **Twist log** button under **More controls** lists each tag,
 when it arrived, what it added, when it merged, and the git diff of its commits, capped at 400 lines.
 No twist has been merged yet. Before `+01:00` the panel says so, and from `+01:00` it lists the
 scripted `twist-1` placeholder.
@@ -339,5 +363,9 @@ scripted `twist-1` placeholder.
 `make test` runs the pytest suite: the engine cases from the spec (the Harbor Night box, a clear box,
 a low urgency C2 box, a dark terminal with a pending release), the API and reset, the gate optimizer
 with lanes 4 to 6 closed, the voice paths with a fake Retell client, the Retell setup and tunnel
-scripts, fixture mode, and every Phase 5 feature. The suite blanks real keys, so it never calls an
-outside service.
+scripts, the prompt endpoint, fixture mode, and every Phase 5 feature. The suite blanks real keys, so
+it never calls an outside service.
+
+`cd frontend && npm test` runs the Vitest suite. It lints every UI string in `frontend/src` for the
+spec's copy rules (no contractions, no dashes, no semicolons in on screen text), and checks the ladder
+helpers and the prompt drawer parser.

@@ -1,128 +1,151 @@
 # Rung demo pitch
 
-A 3 minute pitch with a click by click run of show on the real app, a 30 second version, and a judges
-Q&A sheet. Button and label names below are exactly as they appear on screen.
+A pitch that fits in 2:50 with the live voice call, a click by click run of show on the real app, a
+30 second version, and a judges Q&A sheet. Button and label names below are exactly as they appear on
+screen. Planner controls sit in the app itself. Everything that drives the scenario sits in the
+dashed amber **Demo controls** dock at the bottom of the screen.
 
 ## Before you go on
 
 1. Start the app with `make demo`. For the live call, set it up beforehand: `make tunnel` in a second terminal, `make retell-setup` once, then restart `make demo`. The steps are in the [README](../README.md#a-live-retell-call).
 2. Open http://127.0.0.1:8000 in a browser sized for the projector, 1280 by 720 or larger.
-3. Make one test call on any box, so the browser has already granted the microphone. Then press **Reset**.
-4. Set **Speed** to **Paused**. The header should read Tuesday, 22:00, `+00:00`, Lanes open 6 of 6.
-5. Open a box card and check the Ask the trucker badge reads **Retell web**. If it reads **Simulated**, no Retell key is loaded, and the call will be the scripted one. That still works: pick Confirmed loaded under Trucker answer before you press Ask.
+3. Make one test call on any box, so the browser has already granted the microphone. Then press **Reset** in the dock.
+4. In the dock, press **Pause** next to **Minutes per second**. The header should read Tuesday, 22:00, Lanes open 6 of 6, and the dock should read Scenario `+00:00`.
+5. Open `CMAU9939083` and check the chip in the **Call the trucker** panel. **Retell web call** means the live agent is loaded. **Simulated call** means no Retell key is loaded and the call will be the scripted one. That still works: leave **The simulated trucker answers** on **Trucker backs the scale**.
 6. Close every terminal and editor window. Never put `.env` or a terminal on the projector.
+7. Rehearse the call once with a stopwatch. With the three trucker lines below it runs about 40 seconds. If it runs longer, use the cut rules at the end of the run of show.
 
 The live call needs someone to play the trucker, Dana Ruiz of Pacific Coast Dray. The presenter can
-do it, or a teammate next to the laptop microphone. The lines:
+do it, or a teammate next to the laptop microphone. Keep each answer short and wait for the agent to
+finish its turn. The lines:
 
 - "Yes, this is Dana Ruiz with Pacific Coast Dray."
 - "Yes, it is loaded. The shipper added pallets at the last minute."
 - "Okay, thank you. Goodbye."
 
-## The 3 minute pitch
+## Run of show
 
-### 0:00 The problem
+| Start | Beat | Length |
+| --- | --- | --- |
+| 0:00 | The problem | 15 s |
+| 0:15 | Tuesday: the queue and the ladder | 18 s |
+| 0:33 | The live ask call | 57 s |
+| 1:30 | The voice agent prompt | 18 s |
+| 1:48 | Harbor Night: the gate plan | 32 s |
+| 2:20 | The box that matters | 18 s |
+| 2:38 | The audit log and the close | 12 s |
+| 2:50 | End | |
 
-Screen: the Queue tab, Tuesday, clock paused at 22:00.
+### 0:00 The problem (15 s)
 
-> Every truck that leaves a container terminal goes through a gate, and a yard planner decides which
-> boxes go. For every box, five systems have an opinion: the shipping line's manifest, the terminal,
-> customs, the scale, and the reefer plug. They disagree all the time, and the data goes stale. On a
-> bad night the safe move is to close the gate. That strands every trucker in line, every reefer that
-> needs to leave, and every box about to run into demurrage.
+Screen: the Queue, Tuesday, clock paused at 22:00.
 
-### 0:20 Tuesday at Pier 7
+> Every truck that leaves a container terminal goes through a gate. Five systems describe every box,
+> and they disagree all the time. On a bad night the safe move is to close the gate, and every truck
+> in line pays for it.
 
-Screen: the Queue. Point at the Tuesday chip, Lanes open 6 of 6, and Throughput 90%.
+### 0:15 Tuesday: the queue and the ladder (18 s)
 
-> This is Rung at Pier 7, a terminal in San Pedro Bay. 191 boxes are waiting. For every box Rung reads
-> all five sources, works out how much to trust each one, and puts the box on a ladder: Release,
-> Watch, Ask, Slow, Hold, Hand. Most boxes are clean, so most say Release. A few say Ask.
+Screen: the Queue. Point at the headline **34 boxes need your decision**, then sweep left to right
+across the ladder: Release, Watch, Ask, Slow, Hold, and Hand set apart on the right.
 
-Click: the **Step** filter, then **ASK**. Two rows remain. Click **CMAU9939083**.
+> This is Rung at Pier 7. 191 boxes are waiting. Rung reads all five sources for each one and puts it
+> on the gentlest safe step of this ladder, from Release on the left to Hand, where a person decides.
 
-### 0:40 The ask call
+Click: the **Ask** step in the ladder. Two rows remain. Click **CMAU9939083**.
 
-Screen: the box card for `CMAU9939083`. The step chip says ASK. Point at the conflict "Manifest 36,000
-lb, weighbridge 40,500 lb, gap 12.5 percent" and at the trust bars for carrier and weighbridge.
+### 0:33 The live ask call (57 s)
 
-> The manifest says 36,000 pounds, the scale says 40,500. That is more than 12 percent apart. Either
-> the paperwork is wrong or there is cargo nobody declared. Rung does not guess. It asks. Rung's voice
-> agent will call the trucker right now.
+Screen: the box card. The big card reads **Rung recommends ASK, Get fresher facts** and **The weights
+disagree. Get a reweigh or call the trucker before it leaves.**
 
-Click: **Ask** in the Ask the trucker section. The status reads Connecting, then On the call.
+> The manifest says 36,000 pounds. The scale says 40,500. Rung does not guess. It asks. Its voice
+> agent calls the trucker right now.
+
+Click: **Call the trucker** in the **Call the trucker** panel. The status reads Connecting, then On the
+call.
 
 The agent introduces itself as the Pier 7 gate desk, checks it has Dana Ruiz, reads both weights, and
-asks whether the box is loaded as weighed. The trucker answers with the three lines above. Keep the
-answers short, and wait for the agent to finish each turn.
+asks whether the box is loaded as weighed. The trucker answers with the three lines above.
 
-When the call ends, the transcript lands on the card and the outcome reads Confirmed loaded. The step
-moves to HAND, with **Decide** on the card, and weighbridge trust rises.
+When the agent records the answer, the outcome box reads **Trucker backs the scale** and the big card
+turns violet: **HAND, You decide now**, with **The trucker backed the scale, so the manifest is wrong.
+You decide what happens to this box.** The button under **Your move** now reads **Decide**.
 
-> The trucker backed the scale. Rung raises its trust in the weighbridge, and because the manifest is
-> now known to be wrong, the box goes to Hand: a person decides, with the call on the record. That
-> was a real call, through Retell, and the agent wrote the answer straight back into Rung.
+> The trucker backed the scale, so the manifest is wrong. Rung will not pick a side on its own. A
+> person decides, with the call on the record. That was a real call, through Retell.
 
-If the call is still going at 1:30, keep talking. The outcome lands as soon as the agent records it.
+### 1:30 The voice agent prompt (18 s)
 
-### 1:30 Harbor Night
+Click: **See the agent prompt**, next to **Call again** in the same panel. The **Voice agent prompt**
+drawer opens. Scroll slowly from **Identity** down to **Weight check call** and its four outcomes.
 
-Click: the **Gate** tab. Then set **Speed** to **1 min/s**. Every scenario minute now takes one real
-second, and the scripted events fire on their own.
+> This is the exact prompt that agent ran, read live from our setup script. Who it is, how to say a
+> container number, the weight check steps, and the only four answers it may record. The model runs
+> the conversation. Rung's rules decide what happens next.
 
-> Same app, same code, different night.
+Press **Escape** to close the drawer.
 
-- At `+00:05` the header turns dark blue and the chip reads **Harbor Night**.
-- At `+00:10` lanes 4 to 6 close. The header reads Lanes open 3 of 6, and lanes 4 to 6 turn grey on the grid and read Closed. The moved and overflow lists fill, and the solve time reads under 1 ms.
+IBM Bob prompts: placeholder, pending confirmation that Bob was used. If it was, show the Bob prompts
+here for at most 10 seconds and take the time from the close.
 
-> Half the gate just went down. Rung re-plans every booked truck as an assignment problem, reefers and
-> last free day boxes first. 47 trucks move to a new slot, in under a millisecond.
+### 1:48 Harbor Night: the gate plan (32 s)
 
-- At `+00:20` a customs hold lands on `TCLU7654321`. Rung does not argue with customs. That box goes to HOLD.
-- At `+00:40` the red **Dark feed** banner appears: Terminal feed dark.
+Click: the **Gate plan** tab. Then press **2** next to **Minutes per second** in the dock. Every
+scenario minute now takes half a real second, and the scripted events fire on their own.
 
-> And now the terminal's own data feed goes dark. Rung does not stop. Boxes that depend on that feed
-> wait, and only the trucks due at the gate right now go to the planner.
+> Same app, same code, the worst night of the year.
 
-Click: **Speed**, then **Paused**, as soon as the banner shows.
+- After 3 seconds the header turns dark blue and the chip reads **Harbor Night**.
+- After 5 seconds lanes 4 to 6 close. The header reads Lanes open 3 of 6, Closed 4 to 6, and the headline reads **Lanes 4 to 6 are closed. Rung keeps 96 of 129 trucks moving.**
+- After 10 seconds a customs hold lands on `TCLU7654321`.
+- After 20 seconds the red **Terminal feed dark** banner appears. Press **Pause** right away.
 
-Point at **Rung against closing the terminal**: appointments kept 96 of 129 against 0 of 129, and every
-reefer and every last free day box kept.
+> Half the gate went down, customs placed a hold, and the terminal feed went dark. Rung re-planned
+> every truck in under a millisecond. It keeps 96 of 129 trucks moving, and every reefer. Closing the
+> terminal keeps none.
 
-### 2:15 The box that matters
+Point at the three cards under the headline: Rung 96 against Closed terminal 0, reefers 20 of 20,
+last free day boxes 28 of 28.
 
-Click: the **Queue** tab, the **Step** filter, then **HOLD**. Click **MSKU1234567**.
+### 2:20 The box that matters (18 s)
 
-Screen: the box card. HOLD, Planner tap, Owner: customs broker, urgency 95. Point at the reason in
-large text, then scroll to the Warm up clock in the reefer panel: power off since 21:00, and "Product
-passed 2.6 C at 21:53".
+Click: the **Queue** tab, the **Hold** step in the ladder, then **MSKU1234567**.
 
-> This one is chilled beef, under a customs hold, with the power off since nine o'clock. The warm up
-> clock says the product already passed its limit at 21:53. Releasing it is not ours to give. Customs
-> owns that. So Rung says Hold, names the owner, and attaches the reefer evidence the broker needs to
-> move fast. The planner taps once.
+Screen: the big card reads **HOLD, Waits for its owner** and **Keep this truck at the gate until the
+customs broker clears it. The reefer evidence goes with it.** The amber reefer card below it reads
+**Product passed 2.6 C at 21:53**.
 
-Click: **Approve** next to the step chip.
+> Chilled beef, under a customs hold, power off since nine. Releasing it is not ours to give. Rung
+> says Hold, names the owner, and attaches the reefer evidence. The planner taps once.
 
-### 2:40 The audit log and the close
+Click: **Confirm hold** under **Your move**.
 
-Click: the **Audit log** tab. It opens filtered to `MSKU1234567`, with the planner line on top.
+### 2:38 The audit log and the close (12 s)
 
-> Every step, every call, every override lands here with its reason in plain sentences. Rung never
-> places a hold and never lifts one. It never releases a box on a guess, and a person signs every hard
-> call. On the worst night of the year Rung kept 96 of 129 trucks moving. Closing the gate keeps zero.
-> That is Rung.
+Click: the **Audit log** tab in the header. It opens filtered to `MSKU1234567`, with the planner line on
+top.
 
-### If you have an extra minute
+> Every step, call, and override lands here with its reason. A person signs every hard call. On the
+> worst night of the year Rung kept 96 of 129 trucks moving. That is Rung.
 
-- **Rated orders**: on the Gate tab, flip the **Rated orders** switch in the header. Six boxes get a 03:00 gate out deadline and take their slots first. Five other boxes show as Slid in overflow, each with the slot it lost.
-- **Spoof input**: on any box card, type 41,000 into Carrier weight in lb and press **Send weight**. The weight conflict appears, the carrier trust bar drops, and the step changes on the spot.
-- **Silent reefer**: in the header reefer picker, choose a reefer, pick **Trip circuit**, and press **Apply**. Every unit on that circuit goes quiet, and Rung asks the reefer crew to check the breaker instead of sending a technician to each box.
+### Cut rules
+
+- If the call outcome has not landed by 1:35, keep talking over the hero card until it does, then skip the prompt drawer scroll and only open and close it.
+- If the clock reads 2:30 or later when you reach the box that matters, skip **Confirm hold** and the audit log, and say the close line on the box card.
+- If the dark feed banner is missed and the dock passes `+01:00`, press **Pause** and carry on. The twist event only adds a line to the latest event strip.
+
+## Not in the video, for live Q&A
+
+- **Rated orders**: in the dock, press **More controls**, then the **Rated orders** switch. Six boxes get a 03:00 gate out deadline and take their slots first. On the gate plan, five other boxes show as Slid in **No slot tonight**, each with the slot it lost.
+- **Fake a reading**: on any box card, open **Demo: fake a reading** at the bottom, type 41,000 into **Carrier weight in lb**, and press **Send weight**. The weight conflict appears, carrier trust drops, and the step changes on the spot.
+- **Silent reefer**: in the dock, press **More controls**. Under **Reefer fault**, pick a reefer, choose **Trip circuit**, and press **Apply**. Every unit on that circuit goes quiet, and Rung asks the reefer crew to check the breaker instead of sending a technician to each box.
+- **The ladder in full**: on the Queue, press **How the ladder works** for every step, what it means at the gate, who acts, and how the votes are counted.
 
 ## The 30 second version
 
-Set up first: **Reset**, **Speed** at **1 min/s**, the **Gate** tab open, and wait for the dark feed
-banner at `+00:40`. Then set **Speed** to **Paused**.
+Set up first: **Reset**, press **2** next to **Minutes per second**, open the **Gate plan** tab, and wait
+for the **Terminal feed dark** banner. Then press **Pause**.
 
 > Container terminals close the gate when their data goes bad, and every truck in line pays for it.
 > Rung reads five sources for every box, trusts each one as much as it has earned, and picks the
@@ -144,6 +167,12 @@ No. The decisions come from 15 small rules, each one file with a one line reason
 pure function: the same box at the same time always gets the same answer. The language model only
 runs the phone conversation, and its result is one of four fixed outcomes.
 
+**What prompt does the voice agent run?**
+Press **Voice agent prompt** in the dock, or **See the agent prompt** on any box card. The drawer
+shows the prompt, the six values filled in for each call, the tools the agent can use, and the
+fields read back after the call. It comes from `GET /api/prompts`, which reads
+`scripts/retell_setup.py`, the same script that creates the agent, so the two cannot drift apart.
+
 **What if the voice agent mishears?**
 An unclear answer is recorded as unknown, which keeps the conflict open and votes HOLD. Even a clear
 answer only moves the box to HAND, so a person decides.
@@ -155,8 +184,8 @@ every HOLD.
 
 **How does trust work?**
 Each source starts from a base reliability, halves on a fixed half life as its reading ages, and
-loses 30 percent for each conflict it is part of. A trucker call that backs a source adds 0.20.
-Hover any trust bar to see the arithmetic.
+loses 30 percent for each conflict it is part of. A trucker call that backs a source adds 0.20. Open
+**Sources and trust** on a box card and hover any trust bar to see the arithmetic.
 
 **What happens when a feed goes down?**
 A dark source contributes nothing. Boxes that depend on it WATCH, and only boxes whose truck is due
@@ -174,11 +203,11 @@ attached can be defended. A score cannot. New cases are new rule files, without 
 
 **How do you add a new kind of problem?**
 Add one file in `backend/rules` with a test, a step, and a reason. During the hackathon each twist
-works that way, and the Twist log shows its git diff.
+works that way, and the **Twist log** under **More controls** shows its git diff.
 
 **Can I try to break it?**
-Yes. Every box card has a Spoof input. Type a fake carrier weight or toggle a hold, and the engine
-re-evaluates at once. Each spoof is in the audit log.
+Yes. Every box card has **Demo: fake a reading**. Type a fake carrier weight or place a hold, and the
+engine re-evaluates at once. Each spoof is in the audit log.
 
 **What about refrigerated cargo specifically?**
 Reefer warming and power loss drive urgency. On Harbor Night the card shows a warm up clock to the
