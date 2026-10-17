@@ -49,3 +49,14 @@ One entry per phase. Each entry says what the assistant produced and what a huma
 - It built `AskCall.tsx`, which runs a live web call through `retell-client-js-sdk` or plays the simulated call, plus call tags in the history and audit panel.
 - It wrote 13 voice tests. The suite has 71 tests.
 - Human check: create the "Pier 7 gate desk" agent in Retell with the post call analysis fields, then run one real web call. That path is tested only against a fake client.
+
+## Entry 6. Phase 5, stand-out features
+
+- Asked the assistant to build the five Phase 5 features: dark feed banner, spoof input, rated order mode, silent reefer classifier, and twist diff.
+- It added poller failure tracking and a `dark_feed` list to `GET /api/state`, drawn as a red header banner in place of the old chip.
+- It added `POST /api/box/{number}/spoof` and `Spoof.tsx`. A weight spoof restamps the carrier reading, a hold spoof goes through the existing hold events, and each spoof writes a `spoof` audit line.
+- It added `rated_orders` to `scenario.json`, plus 50 urgency, rule R13, a gate out deadline enforced as a latest window in `backend/gate.py`, `POST /api/scenario/rated`, the header switch, the rated strip, and Slid chips in Overflow measured against a solve with rated orders off.
+- It gave each simulated reefer a circuit, a power draw, alarms, and silences, added the `reefer_silent` and `circuit_trip` events, `classify_silence` in the engine, and rule R14 with one ASK text per class.
+- It wrote `backend/gitdiff.py` for `twist:` commits and twist git tags, and the diff view in the twist panel.
+- It wrote 16 Phase 5 tests. The suite has 87 tests.
+- Human check: the circuit layout (5 yard rows per circuit), the 3 unit trip threshold, the 2 to 8 kW normal draw band, and the 02:00 last window for the 03:00 rated deadline are all assumptions. Confirm them with the terminal.
