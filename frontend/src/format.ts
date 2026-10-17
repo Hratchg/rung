@@ -15,6 +15,7 @@ export const ACTOR: Record<string, { label: string; tone: string }> = {
   planner: { label: 'Planner', tone: 'text-violet-800' },
   engine: { label: 'Engine', tone: 'text-slate-700' },
   voice: { label: 'Voice', tone: 'text-sky-800' },
+  spoof: { label: 'Spoof', tone: 'text-fuchsia-800' },
 }
 
 export function trustLevel(value: number): { label: string; bar: string; text: string } {
@@ -100,6 +101,9 @@ export const SOURCE_FIELDS: Record<string, [string, string, (v: unknown) => stri
     ['product_temp_c', 'Product', celsius],
     ['air_temp_c', 'Air', celsius],
     ['power_on', 'Power', (v) => (v === true ? 'On' : v === false ? 'Off' : 'Unknown')],
+    ['circuit', 'Circuit', words],
+    ['draw_kw', 'Draw', (v) => (typeof v === 'number' ? `${sayNum(v)} kW` : 'Not reported')],
+    ['alarm', 'Alarm', (v) => (v ? String(v) : 'None')],
   ],
 }
 

@@ -138,6 +138,7 @@ function Row({ row, onOverride }: { row: QueueRow; onOverride: () => void }) {
       <td className="px-3 py-2">
         <div className="flex flex-col items-start gap-1">
           <StepChip step={row.step} />
+          {row.rated && <span className="rounded bg-amber-300 px-1.5 font-semibold text-indigo-950">Rated order</span>}
           {row.pinned && <span className="font-semibold text-emerald-800">Top of release</span>}
           {row.hand && !row.planner && <span className="rounded bg-violet-100 px-1.5 font-semibold text-violet-900">Planner tap</span>}
           {row.owner && <span className="text-slate-700">Owner: {row.owner}</span>}
@@ -150,8 +151,9 @@ function Row({ row, onOverride }: { row: QueueRow; onOverride: () => void }) {
       </td>
       <td className="px-3 py-2">
         <div className="flex flex-col gap-0.5">
+          {row.rated && <span className="font-semibold text-amber-800">{row.rated.label}</span>}
           {lfd && <span className={lfd.hours <= 24 ? 'font-semibold text-red-800' : ''}>{lfd.label}</span>}
-          {reefer && <span className={reefer.power_on ? '' : 'font-semibold text-red-800'}>{reefer.label}</span>}
+          {reefer && <span className={reefer.power_on && !reefer.silent ? '' : 'font-semibold text-red-800'}>{reefer.label}</span>}
           {appointment ? (
             <span className={appointment.lane_closed ? 'font-semibold text-amber-800' : ''}>{appointment.label}</span>
           ) : (

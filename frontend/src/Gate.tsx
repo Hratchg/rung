@@ -1,6 +1,6 @@
 import { useMemo, type ReactNode } from 'react'
-import { useGate, useLaneToggle, type Gate, type GateChip } from './api'
-import { laneList, sayHours } from './format'
+import { useGate, useLaneToggle, type Gate, type GateChip, type RatedRowStatus } from './api'
+import { laneList, sayHours, sayTime } from './format'
 import { Notice } from './Queue'
 import { StepChip } from './ui'
 
@@ -8,9 +8,20 @@ const TAGS = [
   { key: 'reefer', letter: 'R', label: 'Reefer', className: 'bg-sky-700 text-white' },
   { key: 'lfd_today', letter: 'L', label: 'Last free day today or past', className: 'bg-amber-400 text-amber-950' },
   { key: 'moved', letter: 'M', label: 'Moved by Rung', className: 'bg-violet-700 text-white' },
+  { key: 'rated', letter: 'D', label: 'Rated order with a gate out deadline', className: 'bg-indigo-950 text-amber-300' },
 ] as const
 
-type Tagged = Pick<GateChip, 'reefer' | 'lfd_today'> & { moved?: boolean }
+type Tagged = Pick<GateChip, 'reefer' | 'lfd_today'> & { moved?: boolean; rated?: boolean }
+
+const RATED_STATUS: Record<RatedRowStatus, { label: string; className: string }> = {
+  on_time: { label: 'On time', className: 'bg-emerald-100 text-emerald-900' },
+  released: { label: 'Released', className: 'bg-emerald-100 text-emerald-900' },
+  late: { label: 'Late', className: 'bg-red-100 text-red-900' },
+  overflow: { label: 'No slot', className: 'bg-red-100 text-red-900' },
+  held: { label: 'On HOLD', className: 'bg-red-100 text-red-900' },
+  missed: { label: 'Missed', className: 'bg-slate-200 text-slate-900' },
+  no_appointment: { label: 'No booking', className: 'bg-slate-200 text-slate-900' },
+}
 
 function Tags({ chip }: { chip: Tagged }) {
   const on = TAGS.filter((t) => chip[t.key])
@@ -213,15 +224,22 @@ function Moved({ gate }: { gate: Gate }) {
 }
 
 function Overflow({ gate }: { gate: Gate }) {
+  const rows = useMemo(() => [...gate.overflow].sort((a, b) => Number(b.slid) - Number(a.slid)), [gate.overflow])
   return (
     <ListSection title="Overflow" count={gate.overflow.length} empty="No overflow. Every box not on HOLD has a slot tonight.">
+      {gate.rated.slid > 0 && (
+        <p className="border-b border-slate-200 bg-red-50 px-4 py-2 font-semibold text-red-900">
+          {gate.rated.slid} boxes slid when rated orders took their slots. They are listed first.
+        </p>
+      )}
       <ul className="divide-y divide-slate-100">
-        {gate.overflow.map((o) => (
+        {rows.map((o) => (
           <li key={o.box} className="px-4 py-2">
             <div className="flex flex-wrap items-center gap-2">
               <BoxLink box={o.box} />
               <Tags chip={o} />
               <StepChip step={o.step} />
+              {o.slid && <span className="rounded bg-red-700 px-1.5 font-semibold text-white">Slid</span>}
               <span className="ml-auto tabular-nums text-slate-700">Urgency {o.urgency}</span>
             </div>
             <p className="text-slate-800">
@@ -231,6 +249,35 @@ function Overflow({ gate }: { gate: Gate }) {
         ))}
       </ul>
     </ListSection>
+  )
+}
+
+function RatedStrip({ gate }: { gate: Gate }) {
+  const r = gate.rated
+  if (!r.on) return null
+  const onTime = r.rows.filter((x) => x.status === 'on_time' || x.status === 'released').length
+  return (
+    <section className="rounded-lg border-2 border-indigo-950 bg-amber-50 px-4 py-3" aria-label="Rated orders">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h3 className="text-lg font-bold">Rated orders</h3>
+        <span>
+          Gate out by {sayTime(r.deadline)}, so the last window is {r.latest_window ?? 'already past'}. {onTime} of {r.rows.length} on time.{' '}
+          {r.slid > 0 ? `${r.slid} other boxes slid to overflow.` : 'No other box slid.'}
+        </span>
+      </div>
+      <ul className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        {r.rows.map((row) => (
+          <li key={row.box} className="rounded-md border border-slate-300 bg-white px-3 py-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <BoxLink box={row.box} />
+              <span className={`rounded px-1.5 font-semibold ${RATED_STATUS[row.status].className}`}>{RATED_STATUS[row.status].label}</span>
+              <span className="ml-auto tabular-nums text-slate-700">Urgency {row.urgency}</span>
+            </div>
+            <p className="text-slate-800">{row.text}</p>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 
@@ -306,6 +353,7 @@ export default function GateScreen() {
       {g && g.windows.length > 0 && (
         <div className="flex flex-col gap-3">
           <Compare gate={g} />
+          <RatedStrip gate={g} />
           <Grid gate={g} />
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
             <Moved gate={g} />

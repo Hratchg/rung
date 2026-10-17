@@ -47,7 +47,41 @@ export type State = {
   carriers: string[]
   scripted_events: ScenarioEvent[]
   powered_reefers: string[]
+  reefers: { number: string; circuit: string | null; power_on: boolean; silent: boolean }[]
   voice: { mode: 'mock' | 'web' | 'phone'; missing: string[]; phone_enabled: boolean }
+  dark_feed: DarkFeedLine[]
+  rated: RatedInfo
+}
+
+export type DarkFeedLine = {
+  source: string
+  cause: 'scenario' | 'poller'
+  since: string
+  minutes: number
+  text: string
+  detail: string
+}
+
+export type RatedInfo = {
+  available: boolean
+  on: boolean
+  deadline: string | null
+  latest_window: string | null
+  boxes: string[]
+}
+
+export type RatedClock = { deadline: string; hours: number; label: string }
+
+export type SilenceKind = 'tripped' | 'telemetry' | 'failed'
+
+export type Silence = {
+  kind: SilenceKind
+  since: string
+  circuit: string | null
+  peers: string[]
+  draw_kw: number | null
+  alarm: string | null
+  label: string
 }
 
 export type Planner = {
@@ -60,7 +94,7 @@ export type Planner = {
 
 export type Clocks = {
   lfd: { date: string; hours: number; label: string } | null
-  reefer: { power_on: boolean; product_temp_c: number; set_point_c: number; label: string } | null
+  reefer: { power_on: boolean; product_temp_c: number; set_point_c: number; silent: boolean; label: string } | null
   appointment: {
     lane: number
     window: string
@@ -87,6 +121,7 @@ export type QueueRow = {
   conflicts: string[]
   planner: Planner | null
   live: boolean
+  rated: RatedClock | null
   dray_carrier: string | null
   clocks: Clocks
   badges: Record<SourceName, Badge>
@@ -140,6 +175,8 @@ export type Warmup = {
   limit_c: number
   note: string
   power_on: boolean
+  cause: 'power' | 'fault' | null
+  silent_since: string | null
   off_since: string | null
   hours_off: number
   limit_at: string | null
@@ -159,7 +196,7 @@ export type AuditLine = {
   trust: Record<SourceName, number>
   reason: string
   owner: string | null
-  actor: 'engine' | 'planner' | string
+  actor: 'engine' | 'planner' | 'voice' | 'spoof' | string
   override: boolean
   note: string
   twist_tag: string | null
@@ -215,11 +252,40 @@ export type BoxDetail = {
   clocks: Clocks
   warmup: Warmup | null
   history: AuditLine[]
+  rated: RatedClock | null
+  silence: Silence | null
+  spoof: SpoofInfo
   call: CallInfo | null
   ask: AskInfo
 }
 
+export type SpoofHoldName = 'customs' | 'USDA' | 'VACIS' | 'line' | 'freight' | 'TMF'
+
+export type SpoofInfo = {
+  available: boolean
+  weight_in_lbs: number | null
+  holds: { name: SpoofHoldName; label: string; active: boolean }[]
+  spoofed: Record<string, string>
+}
+
+export type SpoofBody = { weight_in_lbs?: number; hold?: { name: SpoofHoldName; on: boolean } }
+
+type SpoofSide = { step: Step; trust: Record<SourceName, number> }
+
+export type SpoofResult = { effect: string; before: SpoofSide; after: SpoofSide; decision: EffectiveDecision }
+
 export type TwistAdded = { kind: string; id: string | null; name: string; file: string; created_at: string | null }
+
+export type TwistCommit = {
+  sha: string
+  short: string
+  date: string
+  subject: string
+  via: 'message' | 'git tag'
+  files: { path: string; added: number | null; deleted: number | null }[]
+  patch?: string
+  truncated: boolean
+}
 
 export type Twist = {
   tag: string
@@ -229,6 +295,7 @@ export type Twist = {
   merged_at: string | null
   added: TwistAdded[]
   status: 'received' | 'merged'
+  git: { available: boolean; commits: TwistCommit[] }
 }
 
 export type AuditPayload = { lines: AuditLine[]; total: number; twists: Twist[] }
@@ -239,9 +306,14 @@ export type GateChip = {
   step: Step
   reefer: boolean
   lfd_today: boolean
+  rated: boolean
   lane: number
   window: string
 }
+
+export type RatedRowStatus = 'released' | 'on_time' | 'late' | 'overflow' | 'held' | 'missed' | 'no_appointment'
+
+export type GateOverflow = GateChip & { reason: string; slid: boolean; slid_from: { lane: number; window: string } | null }
 
 export type GateMove = {
   box: string
@@ -266,9 +338,10 @@ export type Gate = {
   units: number
   placed: Record<string, GateChip & { moved: boolean }>
   moved: GateMove[]
-  overflow: (GateChip & { reason: string })[]
+  overflow: GateOverflow[]
   held: (GateChip & { reason: string })[]
   missed: string[]
+  rated: RatedInfo & { slid: number; rows: { box: string; status: RatedRowStatus; text: string; urgency: number }[] }
   solve_ms: number
   solver: string
   error: string | null
@@ -334,9 +407,10 @@ export function useBox(number: string) {
   })
 }
 
-export function useAudit(filters: { box: string; limit: number }) {
+export function useAudit(filters: { box: string; limit: number; diff?: boolean }) {
   const params = new URLSearchParams({ limit: String(filters.limit) })
   if (filters.box) params.set('box', filters.box)
+  if (filters.diff) params.set('diff', 'true')
   return useQuery({
     queryKey: ['audit', filters],
     queryFn: () => request<AuditPayload>(`/api/audit?${params.toString()}`),
@@ -367,6 +441,19 @@ export function useStartCall(number: string) {
   })
 }
 
+export function useSpoof(number: string) {
+  const refresh = useRefreshAll()
+  return useMutation({
+    mutationFn: (body: SpoofBody) => post<SpoofResult>(`/api/box/${encodeURIComponent(number)}/spoof`, body),
+    onSuccess: refresh,
+  })
+}
+
+export function useRatedToggle() {
+  const refresh = useRefreshAll()
+  return useMutation({ mutationFn: (on: boolean) => post<State>('/api/scenario/rated', { on }), onSuccess: refresh })
+}
+
 export function useLaneToggle() {
   const qc = useQueryClient()
   return useMutation({
@@ -386,7 +473,7 @@ export function useScenarioControls() {
     onSuccess: refresh,
   })
   const fire = useMutation({
-    mutationFn: (event: ScenarioEvent) => post('/api/scenario/event', event),
+    mutationFn: (event: ScenarioEvent) => post<State & { applied: ScenarioEvent }>('/api/scenario/event', event),
     onSuccess: refresh,
   })
   return { reset, speed, fire }

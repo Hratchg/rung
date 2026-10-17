@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { SOURCE_NAMES, useBox, type AuditLine, type BoxDetail, type ConflictInfo, type SourceName, type Warmup } from './api'
+import { SOURCE_NAMES, useBox, type AuditLine, type BoxDetail, type ConflictInfo, type Silence, type SourceName, type Warmup } from './api'
 import AskCall from './AskCall'
 import { OverrideDialog, PlannerActions } from './Decide'
 import { ACTOR, SOURCE_FIELDS, SOURCE_TITLE, STEP_META, sayDateTime, sayHours, sayNum, sayTime, sayValue } from './format'
 import { Notice } from './Queue'
+import SpoofForm from './Spoof'
 import { BadgeChip, CallTags, StepChip, TrustBar, UrgencyBar } from './ui'
 
 const CONFLICT_NAMES: Record<string, string> = {
@@ -70,6 +71,7 @@ export default function BoxCard({ number, onAudit }: { number: string; onAudit: 
           <span className="text-lg text-slate-600">No appointment</span>
         )}
         {b.clocks.lfd && <span className={`text-lg ${b.clocks.lfd.hours <= 24 ? 'font-semibold text-red-800' : ''}`}>{b.clocks.lfd.label}</span>}
+        {b.rated && <span className="rounded bg-amber-300 px-2 py-0.5 text-lg font-semibold text-indigo-950">{b.rated.label}</span>}
         {b.live ? <BadgeChip kind="live" /> : null}
       </div>
 
@@ -95,6 +97,8 @@ export default function BoxCard({ number, onAudit }: { number: string; onAudit: 
       </section>
 
       <AskCall box={b} />
+
+      <SpoofForm key={b.number} box={b} />
 
       <section className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5" aria-label="Sources">
         {SOURCE_NAMES.map((name) => (
@@ -176,8 +180,35 @@ function SourcePanel({ name, box }: { name: SourceName; box: BoxDetail }) {
           </div>
         ))}
       </dl>
+      {name === 'reefer' && box.silence && <SilenceLine silence={box.silence} />}
       {name === 'reefer' && box.mode === 'harbor_night' && box.warmup && <WarmupClock warmup={box.warmup} />}
     </article>
+  )
+}
+
+function silenceDetail(s: Silence): string {
+  if (s.kind === 'tripped') {
+    return `${s.peers.length} other units on circuit ${s.circuit} went silent within 10 minutes: ${s.peers.join(', ')}.`
+  }
+  if (s.kind === 'failed') {
+    return s.alarm
+      ? `Sent the alarm ${s.alarm}, then went silent.`
+      : `Drew ${sayNum(s.draw_kw ?? 0)} kW before it went silent, outside the normal 2 to 8 kW band.`
+  }
+  const draw = s.draw_kw != null ? `Drew a normal ${sayNum(s.draw_kw)} kW before it went quiet.` : 'No draw reading before it went quiet.'
+  const peers = s.peers.length ? `Only ${s.peers.join(' and ')} on circuit ${s.circuit} went silent with it.` : 'No other unit on its circuit went silent with it.'
+  return `${draw} ${peers}`
+}
+
+function SilenceLine({ silence }: { silence: Silence }) {
+  return (
+    <div className="rounded-md border-2 border-sky-700 bg-sky-50 p-2" aria-label="Silent reefer">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-semibold">Silent since {sayTime(silence.since)}</span>
+        <span className="rounded bg-sky-700 px-1.5 font-semibold text-white">{silence.label}</span>
+      </div>
+      <p className="mt-1">{silenceDetail(silence)}</p>
+    </div>
   )
 }
 
@@ -186,11 +217,17 @@ function WarmupClock({ warmup }: { warmup: Warmup }) {
     <div className="rounded-md border border-amber-500 bg-amber-50 p-2" aria-label="Warm up clock">
       <div className="font-semibold">Warm up clock, scenario hours</div>
       {warmup.power_on ? (
-        <p>Power on. The clock is stopped.</p>
+        <p>
+          {warmup.silent_since
+            ? `Silent since ${sayTime(warmup.silent_since)}. The last report showed the unit cooling, so the clock has not started.`
+            : 'Power on. The clock is stopped.'}
+        </p>
       ) : (
         <>
           <p className="text-2xl font-bold tabular-nums">{sayHours(warmup.hours_off)}</p>
-          <p>Power off since {sayDateTime(warmup.off_since)}.</p>
+          <p>
+            {warmup.cause === 'fault' ? 'Unit stopped cooling at' : 'Power off since'} {sayDateTime(warmup.off_since)}.
+          </p>
           <p className="font-semibold text-red-800">
             {warmup.hours_left && warmup.hours_left > 0
               ? `Product reaches ${sayNum(warmup.limit_c)} C in ${sayHours(warmup.hours_left)}, at ${sayTime(warmup.limit_at)}.`

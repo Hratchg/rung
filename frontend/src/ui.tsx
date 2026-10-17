@@ -41,7 +41,7 @@ export function TrustBar({ value, reason }: { value: number; reason: string }) {
     <div className="group relative" tabIndex={0} aria-label={`Trust ${value.toFixed(2)}, ${level.label}. ${reason}`}>
       <div className="flex items-center gap-2">
         <div className="h-3 flex-1 overflow-hidden rounded-full bg-slate-200">
-          <div className={`h-full ${level.bar}`} style={{ width: `${Math.round(value * 100)}%` }} />
+          <div className={`h-full ${level.bar} transition-[width] duration-200`} style={{ width: `${Math.round(value * 100)}%` }} />
         </div>
         <span className="text-lg font-bold tabular-nums">{value.toFixed(2)}</span>
         <span className={`font-semibold ${level.text}`}>{level.label}</span>

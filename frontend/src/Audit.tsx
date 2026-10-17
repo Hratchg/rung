@@ -10,7 +10,7 @@ function sayWall(iso: string | null | undefined): string {
   return /(\+00:00|Z)$/.test(iso) ? `${sayDateTime(iso)} UTC` : sayDateTime(iso)
 }
 
-function Drawer({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+function Drawer({ title, onClose, children, wide = false }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
     window.addEventListener('keydown', onKey)
@@ -22,7 +22,7 @@ function Drawer({ title, onClose, children }: { title: string; onClose: () => vo
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="flex h-full w-full max-w-[640px] flex-col bg-white text-slate-900 shadow-2xl"
+        className={`flex h-full w-full flex-col bg-white text-slate-900 shadow-2xl ${wide ? 'max-w-[920px]' : 'max-w-[640px]'}`}
         onClick={(e) => e.stopPropagation()}
       >
         <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
@@ -119,10 +119,10 @@ function AuditItem({ line }: { line: AuditLine }) {
 }
 
 export function TwistPanel({ onClose }: { onClose: () => void }) {
-  const audit = useAudit({ box: '', limit: 1 })
+  const audit = useAudit({ box: '', limit: 1, diff: true })
   const twists = audit.data?.twists
   return (
-    <Drawer title="Twist log" onClose={onClose}>
+    <Drawer title="Twist log" onClose={onClose} wide>
       <p className="text-slate-700">
         A twist arrives as a scenario event or a pasted message. Rung answers each one with one new rule file, event type, or source.
       </p>
@@ -180,6 +180,67 @@ function TwistItem({ twist }: { twist: Twist }) {
           )}
         </dd>
       </dl>
+      <GitDiff twist={twist} />
     </li>
+  )
+}
+
+function diffLineClass(line: string): string {
+  if (line.startsWith('diff --git')) return 'mt-2 bg-slate-800 font-bold text-white'
+  if (line.startsWith('+++') || line.startsWith('---')) return 'font-semibold text-slate-700'
+  if (line.startsWith('@@')) return 'bg-sky-50 text-sky-900'
+  if (line.startsWith('+')) return 'bg-emerald-50 text-emerald-900'
+  if (line.startsWith('-')) return 'bg-red-50 text-red-900'
+  return 'text-slate-800'
+}
+
+function Patch({ patch }: { patch: string }) {
+  const lines = patch.replace(/\n$/, '').split('\n')
+  return (
+    <pre className="mt-2 max-h-[480px] overflow-auto rounded border border-slate-300 bg-white py-1 font-mono text-base leading-6">
+      {lines.map((line, i) => (
+        <div key={i} className={`whitespace-pre px-2 ${diffLineClass(line)}`}>
+          {line || ' '}
+        </div>
+      ))}
+    </pre>
+  )
+}
+
+function GitDiff({ twist }: { twist: Twist }) {
+  const { available, commits } = twist.git
+  return (
+    <section className="mt-3 border-t border-slate-200 pt-2" aria-label={`Git diff for ${twist.tag}`}>
+      <h4 className="font-bold">Git diff</h4>
+      {!available && <p className="text-slate-700">This copy of Rung has no git repo, so there is no diff to show.</p>}
+      {available && commits.length === 0 && (
+        <p className="text-slate-700">
+          No commit with the message <span className="font-mono">twist: {twist.tag}</span> and no git tag named {twist.tag} yet.
+        </p>
+      )}
+      {commits.map((c) => (
+        <details key={c.sha} open={commits.length === 1} className="mt-2 rounded-md border border-slate-300 bg-slate-50 px-3 py-2">
+          <summary className="cursor-pointer">
+            <span className="mr-2 rounded bg-slate-800 px-1.5 font-mono font-bold text-white">{c.short}</span>
+            <span className="mr-2 font-semibold">{c.subject}</span>
+            <span className="text-slate-600">
+              {sayWall(c.date)}
+              {c.via === 'git tag' ? '. Found by git tag' : ''}
+            </span>
+          </summary>
+          <ul className="mt-1 flex flex-col">
+            {c.files.map((f) => (
+              <li key={f.path} className="flex flex-wrap gap-x-3">
+                <span className="font-mono">{f.path}</span>
+                <span className="font-semibold text-emerald-800">{f.added == null ? 'binary' : `plus ${f.added}`}</span>
+                {f.deleted != null && <span className="font-semibold text-red-800">minus {f.deleted}</span>}
+              </li>
+            ))}
+          </ul>
+          {c.patch && <Patch patch={c.patch} />}
+          {c.truncated && <p className="mt-1 text-slate-700">Diff cut short for the panel. Run git show {c.short} for the rest.</p>}
+        </details>
+      ))}
+    </section>
   )
 }
