@@ -65,6 +65,11 @@ def state_payload() -> dict:
         "poller": poller.snapshot(),
         "carriers": sc.carriers(),
         "scripted_events": sc.scripted_events(),
+        "powered_reefers": sorted(
+            s.number
+            for s in sc.boxes.values()
+            if s.reefer_model and not s.released_at and s.reefer_model.power_at(sc.now)
+        ),
         "event_log": sc.event_log[-10:][::-1],
         "resets": sc.resets,
     }
