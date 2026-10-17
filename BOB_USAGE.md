@@ -70,3 +70,11 @@ One entry per phase. Each entry says what the assistant produced and what a huma
 - The Terminal49 key can only create tracking requests. That 401 is now fixture mode with a calm header chip, not a dark feed banner.
 - It wrote 8 tests for the setup script, the `.env` writer, the transport pass through, and fixture mode. The suite has 95 tests.
 - Human check: two real web calls ran with a recorded trucker voice. Both hit `record_outcome` through the tunnel, landed `confirmed_loaded`, and wrote audit lines with the Retell call id. The transcript reaches the card only when the call ends.
+
+## Entry 8. Docs, demo pitch, and merge
+
+- Asked the assistant for a README with a one command quick start, an explainer of how the app works, and a 3 minute demo pitch, then a merge into main.
+- It made `make demo` install on the first run: it creates `.venv`, runs `npm ci`, and copies `.env.example` to `.env` when they are missing, using stamp files so later runs skip installs that are up to date.
+- It rewrote `README.md` and wrote `docs/how-it-works.md` and `docs/demo-pitch.md`, with a click by click run of show, a 30 second version, and a judges Q&A sheet.
+- It recorded the run of show on the real app, including a live Retell call with a recorded trucker voice, with captions and no terminal or `.env` on screen.
+- Human check: rehearse the live call once on the projector machine. The call takes about a minute, and the transcript lands only when it ends.
