@@ -12,6 +12,15 @@ from fastapi import Body, FastAPI, HTTPException, Request
 
 from . import config
 from .audit import Audit, twist_log
+from .emissions import (
+    IDLE_GALLONS_PER_HOUR,
+    IDLE_LIMIT_H,
+    KG_CO2_PER_GALLON_DIESEL,
+    KG_CO2_PER_IDLE_HOUR,
+    SOURCES as EMISSION_SOURCES,
+    Idle,
+    co2_kg,
+)
 from .engine import RULES
 from .feeds import warmup
 from .gate import Assignment
@@ -44,6 +53,7 @@ from .timefmt import (
     parse_dt,
     say_age,
     say_date,
+    say_lb,
     say_num,
     say_time,
 )
@@ -179,6 +189,63 @@ def state_payload() -> dict:
         "voice": voice.status(),
         "dark_feed": dark_feed(),
         "rated": sc.rated_info(),
+        "emissions": emissions_info(),
+    }
+
+
+def emissions_info() -> dict:
+    return {
+        "kg_co2_per_idle_hour": round(KG_CO2_PER_IDLE_HOUR, 3),
+        "idle_gallons_per_hour": IDLE_GALLONS_PER_HOUR,
+        "kg_co2_per_gallon_diesel": KG_CO2_PER_GALLON_DIESEL,
+        "idle_limit_hours": IDLE_LIMIT_H,
+        "label": (
+            f"{say_num(KG_CO2_PER_IDLE_HOUR, 2)} kg CO2 per truck idle hour. A heavy duty diesel truck burns about "
+            f"{say_num(IDLE_GALLONS_PER_HOUR)} gallon of diesel an hour at idle, and each gallon makes "
+            f"{say_num(KG_CO2_PER_GALLON_DIESEL, 2)} kg CO2."
+        ),
+        "sources": list(EMISSION_SOURCES),
+    }
+
+
+IDLE_LEAD = {
+    "kept": ("Leaves in its booked hour.", "Left in its booked hour."),
+    "moved": ("New slot {window} lane {lane}.", "Moved to {window} lane {lane}."),
+    "overflow": ("No open slot tonight.", "Had no open slot."),
+    "hold": ("On HOLD, so it takes no slot.", "Was on HOLD, so it took no slot."),
+    "dark": ("Waiting on a dark feed.", "Waited on a dark feed."),
+}
+
+
+def idle_label(state: BoxState, idle: Idle) -> str:
+    if state.released_at:
+        lead = "Gated out."
+    else:
+        lane, window = idle.slot or (None, None)
+        lead = IDLE_LEAD[idle.cause][idle.settled].format(lane=lane, window=window)
+    minutes = round(idle.hours * 60)
+    if minutes == 0:
+        return f"{lead} No idle at the gate."
+    kg = say_num(co2_kg(idle.hours))
+    if idle.settled:
+        return f"{lead} Idled {minutes} min at the gate, {kg} kg CO2."
+    if idle.cause == "dark":
+        return f"{lead} Idled {minutes} min so far, {kg} kg CO2."
+    return f"{lead} Idles {minutes} min at the gate, {kg} kg CO2."
+
+
+def idle_payload(state: BoxState, plan: Assignment | None = None) -> dict | None:
+    """The truck's expected idle tonight and its CO2. None when no truck is booked for the box."""
+    idle = scenario.idle(state, plan)
+    if idle is None:
+        return None
+    return {
+        "minutes": round(idle.hours * 60),
+        "co2_kg": round(co2_kg(idle.hours), 1),
+        "so_far_minutes": round(idle.so_far(scenario.now) * 60),
+        "cause": idle.cause,
+        "settled": idle.settled,
+        "label": idle_label(state, idle),
     }
 
 
@@ -293,6 +360,7 @@ def queue_row(state: BoxState, plan: Assignment | None = None) -> dict:
         "rated": rated_clock(state),
         "dray_carrier": (state.appointment or {}).get("dray_carrier"),
         "clocks": clocks(state, plan),
+        "idle": idle_payload(state, plan),
         "badges": {name: badge(state, name) for name in SOURCES},
     }
 
@@ -373,6 +441,7 @@ def get_box(number: str) -> dict:
                 "dark": name in scenario.dark_sources or age_h is None or age_h > spec.dark_after_h,
             }
         rules = {r.id: r for r in RULES}
+        _, plan = scenario.gate_plan()
         return {
             "number": state.number,
             "live": state.live,
@@ -396,7 +465,8 @@ def get_box(number: str) -> dict:
                 for rid in d.fired
             ],
             "decision": scenario.effective(state),
-            "clocks": clocks(state, scenario.gate_plan()[1]),
+            "clocks": clocks(state, plan),
+            "idle": idle_payload(state, plan),
             "warmup": warmup(state.reefer_model, scenario.now) if state.reefer_model else None,
             "history": scenario.audit.lines(box=number),
             "rated": rated_clock(state),
@@ -490,6 +560,10 @@ def gate_payload() -> dict:
     def chip(a) -> dict:
         return {"box": a.box, "urgency": a.urgency, "step": a.step, "reefer": a.reefer, "lfd_today": a.lfd_today, "rated": a.rated}
 
+    def idle_of(box: str) -> dict:
+        hours = sc.idle(sc.boxes[box], plan).hours
+        return {"idle_minutes": round(hours * 60), "co2_kg": round(co2_kg(hours), 1)}
+
     def overflow_reason(a) -> str:
         if a.rated and a.latest_window in windows:
             reason = f"No open slot from {a.window} to {a.latest_window}, the last window before the {deadline} gate out deadline. {full}"
@@ -512,6 +586,7 @@ def gate_payload() -> dict:
             "slid": box in slid,
             "slid_from": {"lane": slid[box][0], "window": slid[box][1]} if box in slid else None,
             "reason": overflow_reason(by_box[box]),
+            **idle_of(box),
         }
         for box in plan.overflow
     ]
@@ -521,6 +596,7 @@ def gate_payload() -> dict:
             "lane": by_box[box].lane,
             "window": by_box[box].window,
             "reason": f"On HOLD with the {owners[box]}. The box takes no slot until the hold clears.",
+            **idle_of(box),
         }
         for box in plan.held
     ]
@@ -531,6 +607,11 @@ def gate_payload() -> dict:
     def kept(group) -> int:
         return sum(a.box in plan.placed for a in group)
 
+    rung_idle, blunt_idle = sc.idle_planned()
+    rung_h, blunt_h = round(rung_idle, 1), round(blunt_idle, 1)
+    rung_kg, blunt_kg = round(co2_kg(rung_idle)), round(co2_kg(blunt_idle))
+    avoided_h, avoided_kg = round(blunt_h - rung_h, 1), blunt_kg - rung_kg
+
     return {
         "lanes": [{"id": lane, "open": lane not in sc.lanes_closed} for lane in range(1, sc.lane_count + 1)],
         "windows": windows,
@@ -539,7 +620,13 @@ def gate_payload() -> dict:
         "units": plan.units,
         "placed": placed,
         "moved": [
-            {**m.__dict__, "urgency": by_box[m.box].urgency, "reefer": by_box[m.box].reefer, "lfd_today": by_box[m.box].lfd_today}
+            {
+                **m.__dict__,
+                "urgency": by_box[m.box].urgency,
+                "reefer": by_box[m.box].reefer,
+                "lfd_today": by_box[m.box].lfd_today,
+                **idle_of(m.box),
+            }
             for m in plan.moved
         ],
         "overflow": overflow,
@@ -556,11 +643,29 @@ def gate_payload() -> dict:
                 "kept": len(plan.placed),
                 "reefers_kept": kept(reefers),
                 "lfd_kept": kept(lfd),
+                "idle_hours_plan": rung_h,
+                "idle_co2_kg_plan": rung_kg,
             },
-            "blunt": {**sc.counters_blunt(), "kept": 0, "reefers_kept": 0, "lfd_kept": 0},
+            "blunt": {
+                **sc.counters_blunt(),
+                "kept": 0,
+                "reefers_kept": 0,
+                "lfd_kept": 0,
+                "idle_hours_plan": blunt_h,
+                "idle_co2_kg_plan": blunt_kg,
+            },
             "reefers_total": len(reefers),
             "lfd_total": len(lfd),
             "non_hold": len(non_hold),
+            "idle_hours_avoided": avoided_h,
+            "idle_co2_kg_avoided": avoided_kg,
+            "idle_label": (
+                f"Under the Rung plan these {len(rows)} trucks idle {say_num(rung_h)} h at the gate, {say_lb(rung_kg)} kg CO2. "
+                f"Closing the terminal idles them {say_num(blunt_h)} h, {say_lb(blunt_kg)} kg CO2. "
+                f"Rung avoids {say_num(avoided_h)} idle hours and {say_lb(avoided_kg)} kg CO2."
+                if rows
+                else "No trucks are left in the plan for tonight."
+            ),
         },
     }
 
@@ -686,6 +791,26 @@ async def post_retell_record(request: Request) -> dict:
     }
     eff = scenario.record_call(number, call.get("call_id") or args.get("call_id"), analysis, "record_function")
     return {"result": f"Recorded. Container {spell_box(number)} {STEP_SPOKEN[eff['step']]}."}
+
+
+@app.get("/api/prompts")
+def get_prompts() -> dict:
+    """The prompt and settings scripts/retell_setup.py sends to Retell, read from that script so they never drift."""
+    from scripts import retell_setup
+
+    llm = retell_setup.llm_args("https://rung.example")
+    return {
+        "retell": {
+            "agent_name": retell_setup.AGENT_NAME,
+            "source": "scripts/retell_setup.py",
+            "prompt": llm["general_prompt"],
+            "temperature": llm["model_temperature"],
+            "variables": list(retell_setup.VARIABLES),
+            "tools": [{"name": t["name"], "description": t["description"]} for t in llm["general_tools"]],
+            "analysis": [{"name": a["name"], "description": a["description"]} for a in retell_setup.ANALYSIS],
+            "functions_live": bool(voice.settings.public_base_url),
+        },
+    }
 
 
 @app.get("/api/audit")

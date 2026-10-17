@@ -1,30 +1,3 @@
-import type { Step } from './api'
-
-export const GROUP_ORDER: Step[] = ['HAND', 'HOLD', 'SLOW', 'ASK', 'WATCH', 'RELEASE']
-
-export const STEP_META: Record<Step, { meaning: string; chip: string; rail: string }> = {
-  HAND: { meaning: 'A person must decide now', chip: 'bg-violet-700 text-white', rail: 'border-violet-700' },
-  HOLD: { meaning: 'Gate release withheld for this box until its outside owner clears it', chip: 'bg-red-700 text-white', rail: 'border-red-700' },
-  SLOW: { meaning: 'Keep it moving, later or in another lane', chip: 'bg-amber-400 text-amber-950', rail: 'border-amber-400' },
-  ASK: { meaning: 'Get fresher information before acting', chip: 'bg-sky-700 text-white', rail: 'border-sky-700' },
-  WATCH: { meaning: 'Do nothing yet and recheck at the next poll', chip: 'bg-slate-600 text-white', rail: 'border-slate-500' },
-  RELEASE: { meaning: 'Cleared to dispatch at its slot. Planner confirms with one tap', chip: 'bg-emerald-700 text-white', rail: 'border-emerald-600' },
-}
-
-export const ACTOR: Record<string, { label: string; tone: string }> = {
-  planner: { label: 'Planner', tone: 'text-violet-800' },
-  engine: { label: 'Engine', tone: 'text-slate-700' },
-  voice: { label: 'Voice', tone: 'text-sky-800' },
-  spoof: { label: 'Spoof', tone: 'text-fuchsia-800' },
-}
-
-export function trustLevel(value: number): { label: string; bar: string; text: string } {
-  if (value <= 0) return { label: 'None', bar: 'bg-slate-400', text: 'text-slate-700' }
-  if (value < 0.3) return { label: 'Low', bar: 'bg-red-600', text: 'text-red-800' }
-  if (value < 0.6) return { label: 'Medium', bar: 'bg-amber-500', text: 'text-amber-900' }
-  return { label: 'High', bar: 'bg-emerald-600', text: 'text-emerald-900' }
-}
-
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 /** Terminal local time straight from the ISO string, so the browser time zone never shifts it. */
@@ -51,6 +24,10 @@ export function sayHours(hours: number): string {
   const h = Math.floor(minutes / 60)
   const m = minutes % 60
   return m ? `${h} h ${m} min` : `${h} h`
+}
+
+export function sayKg(kg: number): string {
+  return kg >= 100 ? Math.round(kg).toLocaleString('en-US') : sayNum(kg)
 }
 
 const lb = (v: unknown) => `${Math.round(Number(v)).toLocaleString('en-US')} lb`

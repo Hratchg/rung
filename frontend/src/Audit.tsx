@@ -1,6 +1,9 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
+import { Button } from '@/components/ui/button'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { useAudit, type AuditLine, type Twist } from './api'
-import { ACTOR, sayDateTime } from './format'
+import { ACTOR } from './copy'
+import { sayDateTime } from './format'
 import { CallTags, StepChip } from './ui'
 
 const AUDIT_LIMIT = 100
@@ -10,45 +13,46 @@ function sayWall(iso: string | null | undefined): string {
   return /(\+00:00|Z)$/.test(iso) ? `${sayDateTime(iso)} UTC` : sayDateTime(iso)
 }
 
-function Drawer({ title, onClose, children, wide = false }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+export function Drawer({
+  title,
+  description,
+  open,
+  onClose,
+  children,
+  wide = false,
+}: {
+  title: string
+  description: string
+  open: boolean
+  onClose: () => void
+  children: ReactNode
+  wide?: boolean
+}) {
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-slate-900/40" onClick={onClose}>
-      <aside
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        className={`flex h-full w-full flex-col bg-white text-slate-900 shadow-2xl ${wide ? 'max-w-[920px]' : 'max-w-[640px]'}`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-          <h2 className="text-xl font-bold">{title}</h2>
-          <button type="button" onClick={onClose} className="rounded border border-slate-400 px-3 py-1 font-semibold hover:bg-slate-100">
-            Close
-          </button>
-        </header>
+    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
+      <SheetContent side="right" className={`w-full gap-0 bg-white ${wide ? 'data-[side=right]:sm:max-w-[960px]' : 'data-[side=right]:sm:max-w-[680px]'}`}>
+        <SheetHeader className="border-b border-slate-200 pr-14">
+          <SheetTitle>{title}</SheetTitle>
+          <SheetDescription>{description}</SheetDescription>
+        </SheetHeader>
         <div className="flex-1 overflow-y-auto px-4 py-3">{children}</div>
-      </aside>
-    </div>
+      </SheetContent>
+    </Sheet>
   )
 }
 
-export function AuditPanel({ initialBox, onClose }: { initialBox: string; onClose: () => void }) {
+export function AuditPanel({ open, initialBox, onClose }: { open: boolean; initialBox: string; onClose: () => void }) {
   const [box, setBox] = useState(initialBox)
   const filter = box.trim().toUpperCase()
-  const audit = useAudit({ box: filter, limit: AUDIT_LIMIT })
+  const audit = useAudit({ box: filter, limit: AUDIT_LIMIT }, open)
   const lines = audit.data?.lines
   return (
-    <Drawer title="Audit log" onClose={onClose}>
+    <Drawer title="Audit log" description="Every step change, planner action, call, and spoof, newest first, with the reason in plain sentences." open={open} onClose={onClose}>
       <div className="flex flex-wrap items-end gap-3">
         <label className="flex flex-col">
-          <span className="text-base text-slate-600">Filter by box</span>
+          <span className="text-slate-600">Filter by box</span>
           <input
-            className="w-56 rounded border border-slate-300 px-2 py-1 font-mono text-base uppercase"
+            className="h-10 w-56 rounded-lg border border-slate-300 px-2 font-mono text-base uppercase"
             value={box}
             onChange={(e) => setBox(e.target.value)}
             placeholder="Box number"
@@ -56,20 +60,20 @@ export function AuditPanel({ initialBox, onClose }: { initialBox: string; onClos
           />
         </label>
         {box && (
-          <button type="button" onClick={() => setBox('')} className="rounded border border-slate-400 px-3 py-1 font-semibold hover:bg-slate-100">
+          <Button variant="outline" onClick={() => setBox('')}>
             Show all boxes
-          </button>
+          </Button>
         )}
         {audit.data && (
-          <p className="pb-1 text-slate-600">
-            Newest first. Showing {lines!.length} of {filter ? 'the matching' : audit.data.total} lines.
+          <p className="pb-2 text-slate-600">
+            Showing {lines!.length} of {filter ? 'the matching' : audit.data.total} lines.
           </p>
         )}
       </div>
-      {audit.isError && !lines && <p className="mt-3 rounded bg-red-50 p-3 text-red-900">Cannot reach the audit log. Retrying every 2 seconds.</p>}
+      {audit.isError && !lines && <p className="mt-3 rounded-lg bg-red-50 p-3 text-red-900">Cannot reach the audit log. Retrying every 2 seconds.</p>}
       {audit.isPending && <p className="mt-3 text-slate-700">Loading the audit log</p>}
       {lines && lines.length === 0 && (
-        <p className="mt-3 rounded border border-slate-200 p-4 text-slate-700">
+        <p className="mt-3 rounded-lg border border-slate-200 p-4 text-slate-700">
           {filter ? `No audit lines for a box matching ${filter}.` : 'No audit lines since the last reset.'}
         </p>
       )}
@@ -86,55 +90,58 @@ export function AuditPanel({ initialBox, onClose }: { initialBox: string; onClos
 
 function AuditItem({ line }: { line: AuditLine }) {
   const [open, setOpen] = useState(false)
+  const actor = ACTOR[line.actor] ?? ACTOR.engine
   return (
-    <li className="py-2">
+    <li className="py-2.5">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className="font-semibold tabular-nums">{sayDateTime(line.ts)}</span>
         <a href={`#/box/${line.box}`} className="font-mono font-semibold text-sky-900 underline underline-offset-4">
           {line.box}
         </a>
-        <span className={`font-semibold ${ACTOR[line.actor]?.tone ?? 'text-slate-700'}`}>{ACTOR[line.actor]?.label ?? 'Engine'}</span>
+        <span className={`font-semibold ${actor.tone}`}>{actor.label}</span>
+        <span className="text-slate-600">set</span>
         <StepChip step={line.step} />
         {line.previous_step && line.previous_step !== line.step && <span className="text-slate-600">was {line.previous_step}</span>}
-        {line.override && <span className="rounded bg-violet-100 px-1.5 font-semibold text-violet-900">Override true</span>}
-        {line.hand && <span className="text-violet-900">Hand</span>}
+        {line.override && <span className="rounded bg-violet-100 px-1.5 font-semibold text-violet-900">Override</span>}
         {line.twist_tag && <span className="rounded bg-fuchsia-100 px-1.5 font-semibold text-fuchsia-900">Twist {line.twist_tag}</span>}
-      </div>
-      <div className="mt-0.5 text-slate-700">
-        Urgency {line.urgency}. Fired {line.fired.length ? line.fired.join(', ') : 'none'}. Conflicts {line.conflicts.length ? line.conflicts.join(', ') : 'none'}.
-        {line.owner ? ` Owner: ${line.owner}.` : ''}
       </div>
       {line.call_id && (
         <div className="mt-1">
           <CallTags line={line} />
         </div>
       )}
-      {line.note && <div className="font-semibold">Note: {line.note}</div>}
-      {line.effect && <div>{line.effect}</div>}
-      <button type="button" onClick={() => setOpen(!open)} className={`mt-0.5 text-left text-slate-800 ${open ? '' : 'line-clamp-2'}`}>
+      {line.note && <div className="mt-0.5 font-semibold">Note: {line.note}</div>}
+      {line.effect && <div className="mt-0.5">{line.effect}</div>}
+      <button type="button" onClick={() => setOpen(!open)} className={`mt-0.5 text-left text-slate-800 ${open ? '' : 'line-clamp-2'}`} title={open ? 'Show less' : 'Show the full reason'}>
         {line.reason}
       </button>
+      <div className="mt-0.5 text-slate-500">
+        Urgency {line.urgency}. Rules {line.fired.length ? line.fired.join(', ') : 'none'}. Conflicts {line.conflicts.length ? line.conflicts.join(', ') : 'none'}.
+        {line.owner ? ` Owner: ${line.owner}.` : ''}
+        {line.hand ? ' Needs a planner.' : ''}
+      </div>
     </li>
   )
 }
 
-export function TwistPanel({ onClose }: { onClose: () => void }) {
-  const audit = useAudit({ box: '', limit: 1, diff: true })
+export function TwistPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const audit = useAudit({ box: '', limit: 1, diff: true }, open)
   const twists = audit.data?.twists
   return (
-    <Drawer title="Twist log" onClose={onClose} wide>
-      <p className="text-slate-700">
-        A twist arrives as a scenario event or a pasted message. Rung answers each one with one new rule file, event type, or source.
-      </p>
-      {audit.isError && !twists && <p className="mt-3 rounded bg-red-50 p-3 text-red-900">Cannot reach the twist log. Retrying every 2 seconds.</p>}
-      {audit.isPending && <p className="mt-3 text-slate-700">Loading the twist log</p>}
+    <Drawer
+      title="Twist log"
+      description="Hackathon twists. Rung answers each one with one new rule file, event type, or source."
+      open={open}
+      onClose={onClose}
+      wide
+    >
+      {audit.isError && !twists && <p className="rounded-lg bg-red-50 p-3 text-red-900">Cannot reach the twist log. Retrying every 2 seconds.</p>}
+      {audit.isPending && <p className="text-slate-700">Loading the twist log</p>}
       {twists && twists.length === 0 && (
-        <p className="mt-3 rounded border border-slate-200 p-4 text-slate-700">
-          No twists yet. The scripted twist arrives at plus 01:00 on the scenario clock.
-        </p>
+        <p className="rounded-lg border border-slate-200 p-4 text-slate-700">No twists yet. The scripted twist arrives at plus 01:00 on the scenario clock.</p>
       )}
       {twists && twists.length > 0 && (
-        <ol className="mt-3 flex flex-col gap-3">
+        <ol className="flex flex-col gap-3">
           {twists.map((t) => (
             <TwistItem key={t.tag} twist={t} />
           ))}
@@ -147,7 +154,7 @@ export function TwistPanel({ onClose }: { onClose: () => void }) {
 function TwistItem({ twist }: { twist: Twist }) {
   const merged = twist.status === 'merged'
   return (
-    <li className="rounded-lg border border-slate-300 p-3">
+    <li className="rounded-xl border border-slate-200 p-3">
       <div className="flex flex-wrap items-center gap-2">
         <span className="rounded bg-fuchsia-100 px-2 py-0.5 font-mono text-lg font-bold text-fuchsia-900">{twist.tag}</span>
         <span className={`rounded px-2 py-0.5 font-semibold ${merged ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-950'}`}>
@@ -157,9 +164,7 @@ function TwistItem({ twist }: { twist: Twist }) {
       {twist.text && <p className="mt-2 text-lg">{twist.text}</p>}
       <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
         <dt className="text-slate-600">Received</dt>
-        <dd className="font-semibold">
-          {twist.received_at ? `${sayDateTime(twist.received_at)} scenario time` : sayWall(twist.received_wall)}
-        </dd>
+        <dd className="font-semibold">{twist.received_at ? `${sayDateTime(twist.received_at)} scenario time` : sayWall(twist.received_wall)}</dd>
         <dt className="text-slate-600">Merged</dt>
         <dd className="font-semibold">{sayWall(twist.merged_at)}</dd>
         <dt className="text-slate-600">Added</dt>
@@ -197,9 +202,9 @@ function diffLineClass(line: string): string {
 function Patch({ patch }: { patch: string }) {
   const lines = patch.replace(/\n$/, '').split('\n')
   return (
-    <pre className="mt-2 max-h-[480px] overflow-auto rounded border border-slate-300 bg-white py-1 font-mono text-base leading-6">
+    <pre className="mt-2 max-h-[480px] overflow-auto rounded-lg border border-slate-300 bg-white py-1 font-mono text-base leading-6">
       {lines.map((line, i) => (
-        <div key={i} className={`whitespace-pre px-2 ${diffLineClass(line)}`}>
+        <div key={i} className={`px-2 whitespace-pre ${diffLineClass(line)}`}>
           {line || ' '}
         </div>
       ))}
@@ -219,7 +224,7 @@ function GitDiff({ twist }: { twist: Twist }) {
         </p>
       )}
       {commits.map((c) => (
-        <details key={c.sha} open={commits.length === 1} className="mt-2 rounded-md border border-slate-300 bg-slate-50 px-3 py-2">
+        <details key={c.sha} open={commits.length === 1} className="mt-2 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2">
           <summary className="cursor-pointer">
             <span className="mr-2 rounded bg-slate-800 px-1.5 font-mono font-bold text-white">{c.short}</span>
             <span className="mr-2 font-semibold">{c.subject}</span>

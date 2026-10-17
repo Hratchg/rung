@@ -1,15 +1,18 @@
 import { useMemo, type ReactNode } from 'react'
-import { useGate, useLaneToggle, type Gate, type GateChip, type RatedRowStatus } from './api'
-import { laneList, sayHours, sayTime } from './format'
+import { ArrowRightLeft, CalendarClock, Flag, Snowflake, type LucideIcon } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { useAppState, useGate, useLaneToggle, type Emissions, type Gate, type GateChip, type GateIdle, type RatedRowStatus } from './api'
+import { emissionsNote } from './copy'
+import { laneList, sayHours, sayKg, sayNum, sayTime } from './format'
 import { Notice } from './Queue'
-import { StepChip } from './ui'
+import { InfoHint, StepChip } from './ui'
 
-const TAGS = [
-  { key: 'reefer', letter: 'R', label: 'Reefer', className: 'bg-sky-700 text-white' },
-  { key: 'lfd_today', letter: 'L', label: 'Last free day today or past', className: 'bg-amber-400 text-amber-950' },
-  { key: 'moved', letter: 'M', label: 'Moved by Rung', className: 'bg-violet-700 text-white' },
-  { key: 'rated', letter: 'D', label: 'Rated order with a gate out deadline', className: 'bg-indigo-950 text-amber-300' },
-] as const
+const TAGS: { key: 'reefer' | 'lfd_today' | 'moved' | 'rated'; icon: LucideIcon; label: string; className: string }[] = [
+  { key: 'reefer', icon: Snowflake, label: 'Reefer', className: 'bg-sky-700 text-white' },
+  { key: 'lfd_today', icon: CalendarClock, label: 'Last free day today or past', className: 'bg-amber-400 text-amber-950' },
+  { key: 'moved', icon: ArrowRightLeft, label: 'Moved by Rung', className: 'bg-violet-700 text-white' },
+  { key: 'rated', icon: Flag, label: 'Rated order with a deadline', className: 'bg-indigo-950 text-amber-300' },
+]
 
 type Tagged = Pick<GateChip, 'reefer' | 'lfd_today'> & { moved?: boolean; rated?: boolean }
 
@@ -29,8 +32,8 @@ function Tags({ chip }: { chip: Tagged }) {
   return (
     <span className="flex gap-0.5">
       {on.map((t) => (
-        <span key={t.key} title={t.label} aria-label={t.label} className={`rounded px-1 text-base font-bold leading-6 ${t.className}`}>
-          {t.letter}
+        <span key={t.key} title={t.label} aria-label={t.label} className={`inline-flex size-6 items-center justify-center rounded ${t.className}`}>
+          <t.icon className="size-4" aria-hidden />
         </span>
       ))}
     </span>
@@ -45,49 +48,107 @@ function BoxLink({ box }: { box: string }) {
   )
 }
 
-function SolverChip({ gate }: { gate: Gate }) {
+function SolverLine({ gate }: { gate: Gate }) {
   const fallback = gate.solver !== 'linear_sum_assignment'
   return (
-    <span
-      title={gate.error ?? undefined}
-      className={`rounded-md px-3 py-1 text-base font-semibold ${fallback ? 'bg-amber-100 text-amber-950' : 'bg-emerald-100 text-emerald-900'}`}
-    >
-      {fallback ? 'Fallback greedy urgency sort' : 'Solver scipy linear_sum_assignment'}. Solved in {gate.solve_ms.toFixed(2)} ms
+    <span title={gate.error ?? undefined} className={fallback ? 'font-semibold text-amber-900' : 'text-slate-600'}>
+      {fallback ? 'Solver failed, so Rung used a greedy urgency sort' : 'Solved as an assignment problem with scipy linear_sum_assignment'} in {gate.solve_ms.toFixed(2)} ms.
     </span>
   )
 }
 
-function Compare({ gate }: { gate: Gate }) {
-  const { rung, blunt, appointments, reefers_total, lfd_total } = gate.compare
-  const cards: [string, string, string][] = [
-    ['Appointments kept', `${rung.kept} of ${appointments}`, `0 of ${appointments}`],
-    ['Reefers kept', `${rung.reefers_kept} of ${reefers_total}`, `${blunt.reefers_kept} of ${reefers_total}`],
-    ['Last free day boxes kept', `${rung.lfd_kept} of ${lfd_total}`, `${blunt.lfd_kept} of ${lfd_total}`],
-    ['Throughput', `${rung.throughput_pct}%`, `${blunt.throughput_pct}%`],
+function idleText(t: GateIdle): string {
+  return t.idle_minutes > 0 ? ` Idles ${sayHours(t.idle_minutes / 60)} at the gate, ${sayKg(t.co2_kg)} kg CO2.` : ''
+}
+
+function EmissionsFootnote({ emissions }: { emissions: Emissions | undefined }) {
+  if (!emissions) return null
+  return (
+    <p className="mt-2 flex flex-wrap items-center gap-x-1.5 text-slate-600">
+      <span>Idle CO2 is modelled, not measured, at {sayNum(emissions.kg_co2_per_idle_hour, 2)} kg per truck idle hour. Sources:</span>
+      {emissions.sources.map((src, i) => (
+        <span key={src.url}>
+          <a href={src.url} target="_blank" rel="noreferrer" title={src.label} className="underline decoration-slate-400 underline-offset-2 hover:text-slate-900">
+            {src.label.split(',')[0]}
+          </a>
+          {i < emissions.sources.length - 1 ? ',' : ''}
+        </span>
+      ))}
+      <InfoHint label="How the CO2 factor is built" text={emissionsNote(emissions)} />
+    </p>
+  )
+}
+
+function Hero({ gate }: { gate: Gate }) {
+  const emissions = useAppState().data?.emissions
+  const { rung, blunt, appointments, reefers_total, lfd_total, idle_hours_avoided, idle_co2_kg_avoided } = gate.compare
+  const closed = gate.lanes.filter((l) => !l.open).map((l) => l.id)
+  const big: [string, number, number, number][] = [
+    ['Trucks kept on the gate plan', rung.kept, 0, appointments],
+    ['Reefers kept', rung.reefers_kept, blunt.reefers_kept, reefers_total],
+    ['Last free day boxes kept', rung.lfd_kept, blunt.lfd_kept, lfd_total],
+  ]
+  const small: [string, string, string][] = [
+    ['Bookings kept', `${rung.throughput_pct}%`, `${blunt.throughput_pct}%`],
     ['Released so far', String(rung.released), String(blunt.released)],
-    ['Reefers past the loss limit', String(rung.reefers_lost), String(blunt.reefers_lost)],
+    ['Reefers lost', String(rung.reefers_lost), String(blunt.reefers_lost)],
   ]
   return (
-    <section className="rounded-lg border border-slate-300 bg-white px-4 py-3" aria-label="Rung against closing the terminal">
-      <div className="flex flex-wrap items-baseline gap-x-3">
-        <h3 className="text-lg font-bold">Rung against closing the terminal</h3>
-        <p className="text-base text-slate-600">The blunt move shuts the gate. Nothing leaves, so no booking is kept.</p>
+    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" aria-label="Rung against closing the terminal">
+      <h2 className="text-2xl font-bold tracking-tight">
+        {closed.length > 0
+          ? `Lanes ${laneList(closed)} are closed. Rung keeps ${rung.kept} of ${appointments} trucks moving and saves ${sayNum(idle_hours_avoided, 0)} idle hours and ${sayKg(idle_co2_kg_avoided)} kg of CO2.`
+          : `All ${gate.lanes.length} lanes are open. Rung keeps ${rung.kept} of ${appointments} trucks on the plan.`}
+      </h2>
+      <p className="text-lg text-slate-700">
+        {closed.length > 0
+          ? 'The blunt move on a bad night is to close the terminal. Then nothing leaves and every truck in line waits.'
+          : 'When lanes close, Rung moves every booked truck to the best open slot, reefers and last free day boxes first.'}{' '}
+        <SolverLine gate={gate} />
+      </p>
+      <div className="mt-3 grid gap-3 md:grid-cols-4">
+        {big.map(([label, a, b, total]) => (
+          <div key={label} className="rounded-lg border border-slate-200 px-4 py-3">
+            <p className="text-slate-700">{label}</p>
+            <p className="mt-1 flex items-baseline gap-2">
+              <span className="font-semibold text-emerald-800">Rung</span>
+              <span className="text-3xl font-bold tabular-nums">{a}</span>
+              <span className="text-lg text-slate-600">of {total}</span>
+            </p>
+            <p className="flex items-baseline gap-2">
+              <span className="font-semibold text-red-800">Closed terminal</span>
+              <span className="text-lg font-semibold tabular-nums">{b}</span>
+              <span className="text-slate-600">of {total}</span>
+            </p>
+          </div>
+        ))}
+        <div className="rounded-lg border border-slate-200 px-4 py-3">
+          <p className="text-slate-700">Truck idle at the gate tonight</p>
+          <p className="mt-1 flex items-baseline gap-2">
+            <span className="font-semibold text-emerald-800">Rung</span>
+            <span className="text-3xl font-bold tabular-nums">{sayKg(rung.idle_co2_kg_plan)}</span>
+            <span className="text-lg text-slate-600">kg CO2, {sayNum(rung.idle_hours_plan, 0)} h</span>
+          </p>
+          <p className="flex items-baseline gap-2">
+            <span className="font-semibold text-red-800">Closed terminal</span>
+            <span className="text-lg font-semibold tabular-nums">{sayKg(blunt.idle_co2_kg_plan)}</span>
+            <span className="text-slate-600">kg, {sayNum(blunt.idle_hours_plan, 0)} h</span>
+          </p>
+        </div>
       </div>
-      <dl className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
-        {cards.map(([label, a, b]) => (
-          <div key={label} className="rounded-md border border-slate-200 px-3 py-2">
-            <dt className="text-base text-slate-700">{label}</dt>
-            <dd className="flex flex-wrap items-baseline gap-x-2">
-              <span className="text-base font-semibold text-emerald-800">Rung</span>
-              <span className="text-lg font-bold tabular-nums">{a}</span>
-            </dd>
-            <dd className="flex flex-wrap items-baseline gap-x-2 text-base">
-              <span className="font-semibold text-red-800">Closed</span>
-              <span className="tabular-nums">{b}</span>
+      <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-1">
+        {small.map(([label, a, b]) => (
+          <div key={label} className="flex items-baseline gap-2">
+            <dt className="text-slate-700">{label}</dt>
+            <dd className="font-semibold">
+              <span className="text-emerald-800">Rung</span> <span className="tabular-nums">{a}</span>
+              <span className="mx-2 text-slate-400">|</span>
+              <span className="text-red-800">Closed</span> <span className="tabular-nums">{b}</span>
             </dd>
           </div>
         ))}
       </dl>
+      <EmissionsFootnote emissions={emissions} />
     </section>
   )
 }
@@ -118,7 +179,7 @@ function Grid({ gate }: { gate: Gate }) {
   }, [gate.lanes, gate.moved, gate.overflow])
 
   return (
-    <section aria-label="Lanes by window" className="overflow-x-auto rounded-lg border border-slate-300 bg-white">
+    <section aria-label="Lanes by window" className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
       <table className="w-full min-w-[1100px] table-fixed border-collapse text-base">
         <colgroup>
           <col className="w-[112px]" />
@@ -126,7 +187,7 @@ function Grid({ gate }: { gate: Gate }) {
             <col key={w} />
           ))}
         </colgroup>
-        <thead className="bg-slate-800 text-white">
+        <thead className="border-b border-slate-200 bg-slate-50 text-slate-700">
           <tr>
             <th className="px-2 py-2 text-left font-semibold">Lane</th>
             {gate.windows.map((w) => (
@@ -138,19 +199,20 @@ function Grid({ gate }: { gate: Gate }) {
         </thead>
         <tbody>
           {gate.lanes.map((lane) => (
-            <tr key={lane.id} className={`border-t border-slate-200 align-top ${lane.open ? '' : 'bg-slate-100'}`}>
+            <tr key={lane.id} className={`border-t border-slate-200 align-top ${lane.open ? '' : 'bg-[repeating-linear-gradient(135deg,#f1f5f9_0,#f1f5f9_10px,#e2e8f0_10px,#e2e8f0_20px)]'}`}>
               <th scope="row" className="px-2 py-2 text-left">
                 <div className="text-lg font-bold">Lane {lane.id}</div>
                 <div className={`font-semibold ${lane.open ? 'text-emerald-800' : 'text-red-800'}`}>{lane.open ? 'Open' : 'Closed'}</div>
-                <button
-                  type="button"
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-1"
                   disabled={toggle.isPending}
                   onClick={() => toggle.mutate({ lane: lane.id, open: !lane.open })}
                   aria-label={`${lane.open ? 'Close' : 'Open'} lane ${lane.id}`}
-                  className="mt-1 rounded-md border border-slate-400 px-2 py-0.5 font-semibold hover:bg-slate-100 disabled:opacity-50"
                 >
                   {lane.open ? 'Close' : 'Open'}
-                </button>
+                </Button>
               </th>
               {gate.windows.map((w) => {
                 const key = `${lane.id} ${w}`
@@ -179,7 +241,7 @@ function Grid({ gate }: { gate: Gate }) {
                         )}
                       </ul>
                     ) : (
-                      <span className="text-slate-600">{away > 0 ? `${away} moved out` : 'Closed'}</span>
+                      <span className="text-slate-600">{away > 0 ? `Closed. ${away} trucks moved out` : 'Closed'}</span>
                     )}
                   </td>
                 )
@@ -194,7 +256,7 @@ function Grid({ gate }: { gate: Gate }) {
 
 function ListSection({ title, count, children, empty }: { title: string; count: number; children: ReactNode; empty: string }) {
   return (
-    <section className="rounded-lg border border-slate-300 bg-white" aria-label={title}>
+    <section className="rounded-xl border border-slate-200 bg-white shadow-sm" aria-label={title}>
       <h3 className="border-b border-slate-200 px-4 py-2 text-lg font-bold">
         {title} <span className="font-semibold text-slate-600">{count}</span>
       </h3>
@@ -205,7 +267,7 @@ function ListSection({ title, count, children, empty }: { title: string; count: 
 
 function Moved({ gate }: { gate: Gate }) {
   return (
-    <ListSection title="Moved" count={gate.moved.length} empty="Nobody moved. Every booking keeps its lane and window.">
+    <ListSection title="Moved to a new slot" count={gate.moved.length} empty="Nobody moved. Every booking keeps its lane and window.">
       <ul className="divide-y divide-slate-100">
         {gate.moved.map((m) => (
           <li key={m.box} className="px-4 py-2">
@@ -215,7 +277,10 @@ function Moved({ gate }: { gate: Gate }) {
               <span className="tabular-nums text-slate-700">Urgency {m.urgency}</span>
               <span className="ml-auto font-semibold tabular-nums">{m.delay_hours > 0 ? `${sayHours(m.delay_hours)} later` : 'Same window'}</span>
             </div>
-            <p className="text-slate-800">{m.reason}</p>
+            <p className="text-slate-800">
+              {m.reason}
+              {idleText(m)}
+            </p>
           </li>
         ))}
       </ul>
@@ -226,10 +291,10 @@ function Moved({ gate }: { gate: Gate }) {
 function Overflow({ gate }: { gate: Gate }) {
   const rows = useMemo(() => [...gate.overflow].sort((a, b) => Number(b.slid) - Number(a.slid)), [gate.overflow])
   return (
-    <ListSection title="Overflow" count={gate.overflow.length} empty="No overflow. Every box not on HOLD has a slot tonight.">
+    <ListSection title="No slot tonight" count={gate.overflow.length} empty="Every box not on Hold has a slot tonight.">
       {gate.rated.slid > 0 && (
         <p className="border-b border-slate-200 bg-red-50 px-4 py-2 font-semibold text-red-900">
-          {gate.rated.slid} boxes slid when rated orders took their slots. They are listed first.
+          {gate.rated.slid} boxes lost their slot when rated orders took it. They are listed first.
         </p>
       )}
       <ul className="divide-y divide-slate-100">
@@ -239,11 +304,12 @@ function Overflow({ gate }: { gate: Gate }) {
               <BoxLink box={o.box} />
               <Tags chip={o} />
               <StepChip step={o.step} />
-              {o.slid && <span className="rounded bg-red-700 px-1.5 font-semibold text-white">Slid</span>}
+              {o.slid && <span className="rounded bg-red-700 px-1.5 font-semibold text-white">Lost its slot to a rated order</span>}
               <span className="ml-auto tabular-nums text-slate-700">Urgency {o.urgency}</span>
             </div>
             <p className="text-slate-800">
               Booked {o.window} lane {o.lane}. {o.reason}
+              {idleText(o)}
             </p>
           </li>
         ))}
@@ -262,7 +328,7 @@ function RatedStrip({ gate }: { gate: Gate }) {
         <h3 className="text-lg font-bold">Rated orders</h3>
         <span>
           Gate out by {sayTime(r.deadline)}, so the last window is {r.latest_window ?? 'already past'}. {onTime} of {r.rows.length} on time.{' '}
-          {r.slid > 0 ? `${r.slid} other boxes slid to overflow.` : 'No other box slid.'}
+          {r.slid > 0 ? `${r.slid} other boxes lost their slot.` : 'No other box lost its slot.'}
         </span>
       </div>
       <ul className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
@@ -288,7 +354,7 @@ function Held({ gate }: { gate: Gate }) {
       {gate.held.length > 0 && (
         <details>
           <summary className="cursor-pointer font-semibold">
-            {gate.held.length} boxes on HOLD take no slot until their hold clears
+            {gate.held.length} boxes on Hold take no slot until their owner clears the hold
           </summary>
           <ul className="mt-2 divide-y divide-slate-100">
             {gate.held.map((h) => (
@@ -321,29 +387,9 @@ export default function GateScreen() {
   const gate = useGate()
   const toggle = useLaneToggle()
   const g = gate.data
-  const closed = g ? g.lanes.filter((l) => !l.open).map((l) => l.id) : []
 
   return (
-    <main className="px-4 pb-10 pt-4">
-      <div className="mb-3 flex flex-wrap items-center gap-3">
-        <h2 className="mr-2 text-xl font-bold">Gate plan</h2>
-        {g && <SolverChip gate={g} />}
-        {g && (
-          <span className="text-base text-slate-700">
-            {Object.keys(g.placed).length} placed in {g.units} slots. {g.capacity} trucks per lane per hour.{' '}
-            {closed.length > 0 ? `Lanes closed ${laneList(closed)}.` : 'All lanes open.'}
-          </span>
-        )}
-        <span className="flex flex-wrap items-center gap-2 text-base text-slate-700 sm:ml-auto">
-          {TAGS.map((t) => (
-            <span key={t.key} className="flex items-center gap-1">
-              <span className={`rounded px-1 font-bold leading-6 ${t.className}`}>{t.letter}</span>
-              {t.label}
-            </span>
-          ))}
-        </span>
-      </div>
-
+    <main className="mx-auto flex max-w-[1400px] flex-col gap-3 px-4 pt-4 pb-6">
       {gate.isError && !g && <Notice tone="error">Cannot reach the gate plan. Retrying every 2 seconds.</Notice>}
       {gate.isPending && <Notice>Solving the gate plan</Notice>}
       {toggle.error && <Notice tone="error">{toggle.error.message}</Notice>}
@@ -351,16 +397,32 @@ export default function GateScreen() {
       {g && g.windows.length === 0 && <Notice>Every window tonight has ended. Nothing left to plan.</Notice>}
 
       {g && g.windows.length > 0 && (
-        <div className="flex flex-col gap-3">
-          <Compare gate={g} />
+        <>
+          <Hero gate={g} />
           <RatedStrip gate={g} />
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
+            <h3 className="text-lg font-bold">Gate plan by lane and hour</h3>
+            <span className="text-slate-700">
+              {Object.keys(g.placed).length} trucks in {g.units} slots. {g.capacity} trucks per lane per hour. Close or open a lane to watch Rung plan again.
+            </span>
+            <span className="flex flex-wrap items-center gap-3 text-slate-700 sm:ml-auto">
+              {TAGS.map((t) => (
+                <span key={t.key} className="flex items-center gap-1">
+                  <span className={`inline-flex size-6 items-center justify-center rounded ${t.className}`}>
+                    <t.icon className="size-4" aria-hidden />
+                  </span>
+                  {t.label}
+                </span>
+              ))}
+            </span>
+          </div>
           <Grid gate={g} />
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
             <Moved gate={g} />
             <Overflow gate={g} />
           </div>
           <Held gate={g} />
-        </div>
+        </>
       )}
     </main>
   )
