@@ -19,11 +19,21 @@ from stdnum import iso6346
 from . import config
 from .audit import Audit, decision_line
 from .engine import evaluate
-from .feeds import ReeferModel, loss_limit_c, reefer_model, weighbridge_reading
+from .feeds import ReeferModel, circuit_for, loss_limit_c, reefer_model, weighbridge_reading
 from .gate import Appt, Assignment, solve
-from .models import CALL_OUTCOMES, CUSTOMS_HOLD_NAMES, STEPS, Box, Decision
+from .models import CALL_OUTCOMES, CUSTOMS_HOLD_NAMES, HOLD_LABELS, STEPS, Box, Decision
 from .t49 import map_container
-from .timefmt import format_offset, hours_between, iso, lfd_deadline, parse_date, parse_dt, parse_offset, window_at
+from .timefmt import (
+    format_offset,
+    hours_between,
+    iso,
+    lfd_deadline,
+    parse_date,
+    parse_dt,
+    parse_offset,
+    say_lb,
+    window_at,
+)
 from .voice import trucker_name
 
 CALL_FINAL = ("ended", "error", "not_connected")
@@ -50,6 +60,7 @@ REEFER_PROFILES = (
 NON_REEFER_TYPES = (("dry", 80), ("open top", 6), ("flat rack", 5), ("tank", 5), ("bulk", 4))
 HOLD_KINDS = ("customs", "line", "freight", "TMF")
 HOLD_TEXT = {"customs": "CBP HOLD", "line": "LINE HOLD", "freight": "FREIGHT HOLD", "TMF": "TMF HOLD"}
+SPOOF_HOLD_TEXT = {**HOLD_TEXT, "USDA": "USDA HOLD", "VACIS": "VACIS EXAM"}
 DEMURRAGE_PER_DAY = {"reefer": 440, "dry": 275}
 EVENT_TYPES = (
     "mode",
@@ -63,7 +74,17 @@ EVENT_TYPES = (
     "source_back",
     "fee_increase",
     "twist",
+    # Phase 5, silent reefer classifier. Each one only shapes the readings, the engine works out the class.
+    "reefer_silent",
+    "circuit_trip",
 )
+# Units on a tripped circuit drop off the monitoring system one minute apart as their racks lose power.
+TRIP_STAGGER = timedelta(minutes=1)
+SILENT_ASK_EFFECT = {
+    "tripped": "Reefer crew asked to check circuit {circuit}.",
+    "failed": "Reefer technician asked to inspect the unit.",
+    "telemetry": "Reefer crew asked for a manual temperature read.",
+}
 
 
 def load_config(path: Path) -> dict:
@@ -275,6 +296,8 @@ class BoxState:
     released_at: datetime | None = None
     demurrage_avoided: float = 0.0
     call: dict | None = None
+    # Source name to the scenario time a judge last spoofed it.
+    spoofed: dict[str, str] = field(default_factory=dict)
 
     def reefer_reading(self, now: datetime) -> dict | None:
         return self.reefer_model.reading(now) if self.reefer_model else None
@@ -326,11 +349,20 @@ class Scenario:
             self.next_event = 0
             self.event_log: list[dict] = []
             self.twists: list[dict] = []
-            self.gate_cache: tuple[tuple, list[Appt], Assignment] | None = None
+            self.gate_cache: tuple[tuple, list[Appt], Assignment, dict] | None = None
             self.boxes: dict[str, BoxState] = {}
             for c in list(cfg.get("containers", [])) + generate_synthetic(cfg):
                 state = self._box_state(c)
                 self.boxes[state.number] = state
+            self.circuits: dict[str, list[BoxState]] = {}
+            for state in sorted(self.boxes.values(), key=lambda s: s.number):
+                if state.reefer_model and state.reefer_model.circuit:
+                    self.circuits.setdefault(state.reefer_model.circuit, []).append(state)
+            rated = cfg.get("rated_orders") or {}
+            self.rated_on = False
+            self.rated_deadline = self.start + parse_offset(rated["deadline"]) if rated.get("deadline") else None
+            self.rated_boxes = [n for n in rated.get("boxes", []) if n in self.boxes] if self.rated_deadline else []
+            self.rated_latest_window = self._latest_window(self.rated_deadline)
             self.clock = Clock(self.start, self.speed)
             self.now = self.start
             self.resets += 1
@@ -348,6 +380,7 @@ class Scenario:
         if terminal is not None:
             terminal.setdefault("holds", [])
         reefer = c.get("reefer")
+        circuit = circuit_for((terminal or {}).get("location_at_pod_terminal"))
         return BoxState(
             number=c["number"],
             live=bool(c.get("live")),
@@ -356,13 +389,36 @@ class Scenario:
             terminal=terminal,
             customs=c.get("customs"),
             weighbridge=c.get("weighbridge"),
-            reefer_model=reefer_model(c["number"], self.seed, reefer, parse_dt) if reefer else None,
+            reefer_model=reefer_model(c["number"], self.seed, reefer, parse_dt, circuit) if reefer else None,
             appointment=appt,
             weight_case=c.get("weight_case"),
         )
 
-    def box_view(self, state: BoxState, now: datetime | None = None) -> Box:
+    def _latest_window(self, deadline: datetime | None) -> str | None:
+        """The last window whose hour ends by the deadline, so a truck in it gates out in time."""
+        if deadline is None:
+            return None
+        fits = [w for w in self.windows if window_at(w, self.start) + timedelta(hours=1) <= deadline]
+        return fits[-1] if fits else None
+
+    def is_rated(self, state: BoxState) -> bool:
+        return self.rated_on and state.number in self.rated_boxes
+
+    def circuit_peers(self, state: BoxState, now: datetime) -> tuple[dict, ...]:
+        model = state.reefer_model
+        if not model or not model.circuit:
+            return ()
+        peers = []
+        for other in self.circuits.get(model.circuit, []):
+            if other is state or other.released_at:
+                continue
+            reading = other.reefer_reading(now)
+            peers.append({"number": other.number, "last_seen": reading["last_seen"], "comms_lost_at": reading["comms_lost_at"]})
+        return tuple(peers)
+
+    def box_view(self, state: BoxState, now: datetime | None = None, rated: bool | None = None) -> Box:
         now = now or self.now
+        rated = self.is_rated(state) if rated is None else rated
         return Box(
             number=state.number,
             live=state.live,
@@ -378,6 +434,8 @@ class Scenario:
             pending_release=state.pending_release,
             live_sources=frozenset(state.live_sources),
             call_outcome=(state.call or {}).get("outcome"),
+            rated=iso(self.rated_deadline) if rated else None,
+            circuit_peers=self.circuit_peers(state, now),
         )
 
     def advance(self) -> datetime:
@@ -507,6 +565,8 @@ class Scenario:
             if "C1" in [c.code for c in d.conflicts]:
                 state.weight_asked = True
                 return "Weight ask sent. Reweigh requested."
+            if "R14" in d.fired and d.silence:
+                return SILENT_ASK_EFFECT[d.silence["kind"]].format(circuit=d.silence["circuit"])
             return "Ask recorded."
         if step == "SLOW":
             return self._rebook(state)
@@ -528,6 +588,78 @@ class Scenario:
         appt["at"] = iso(window_at(slot[1], self.start))
         self.gate_cache = None
         return f"Moved from {old_window} lane {old_lane} to {slot[1]} lane {slot[0]}."
+
+    def rated_info(self) -> dict:
+        return {
+            "available": bool(self.rated_boxes),
+            "on": self.rated_on,
+            "deadline": iso(self.rated_deadline),
+            "latest_window": self.rated_latest_window,
+            "boxes": list(self.rated_boxes),
+        }
+
+    def set_rated(self, on: bool) -> dict:
+        with self.lock:
+            if not self.rated_boxes:
+                raise ValueError("scenario.json lists no rated orders.")
+            self.advance()
+            if self.rated_on != on:
+                self.rated_on = on
+                self.event_log.append(
+                    {"at": iso(self.now), "offset": format_offset(self.now - self.start), "scripted": False, "type": "rated_orders", "on": on}
+                )
+                self.after_advance()
+            return self.rated_info()
+
+    def spoof(self, number: str, weight: int | None, hold: tuple[str, bool] | None) -> dict:
+        """Judge input: a fake carrier weight or a hold toggle, then the engine re-evaluates the box."""
+        with self.lock:
+            self.advance()
+            state = self.boxes.get(number)
+            if state is None:
+                raise KeyError(number)
+            if state.released_at:
+                raise ValueError("Box already released. Spoof a box that is still in the yard.")
+            if weight is None and hold is None:
+                raise ValueError("Send a carrier weight or a hold to spoof.")
+            before = self.effective(state)
+            stamp = iso(self.now)
+            effects = []
+            if weight is not None:
+                if state.carrier is None:
+                    state.carrier = {}
+                old = state.carrier.get("weight_in_lbs")
+                state.carrier["weight_in_lbs"] = weight
+                state.carrier["observed_at"] = stamp
+                state.spoofed["carrier"] = stamp
+                was = f", was {say_lb(old)} lb" if old is not None else ""
+                effects.append(f"Carrier weight set to {say_lb(weight)} lb{was}.")
+            if hold is not None:
+                name, on = hold
+                source = "customs" if name in CUSTOMS_HOLD_NAMES else "terminal"
+                stamp_field = "observed_at" if source == "customs" else "terminal_checked_at"
+                if getattr(state, source) is None:
+                    setattr(state, source, {"holds": [], stamp_field: stamp})
+                label = HOLD_LABELS[name]
+                if on:
+                    hold_body = {"name": name, "status": "hold", "description": SPOOF_HOLD_TEXT[name]}
+                    self.apply_event({"type": "hold_placed", "box": number, "hold": hold_body, "spoof": True}, self.now, scripted=False)
+                    effects.append(f"{label} hold placed.")
+                else:
+                    present = any(h["name"] == name for h in getattr(state, source).get("holds", []))
+                    self.apply_event({"type": "hold_cleared", "box": number, "name": name, "spoof": True}, self.now, scripted=False)
+                    effects.append(f"{label} hold cleared." if present else f"No {label.lower()} hold to clear.")
+                state.spoofed[source] = stamp
+            d = self._evaluate(state)
+            after = self.effective(state)
+            effect = "Spoof input. " + " ".join(effects)
+            self.audit.write(decision_line(d, stamp, before["step"], actor="spoof", step=after["step"], action="spoof", effect=effect))
+            return {
+                "effect": effect,
+                "before": {"step": before["step"], "trust": before["trust"]},
+                "after": {"step": after["step"], "trust": after["trust"]},
+                "decision": after,
+            }
 
     def call_variables(self, number: str) -> tuple[dict[str, str], str | None]:
         """Retell dynamic variables, all strings, and the trucker phone for a phone call."""
@@ -700,6 +832,7 @@ class Scenario:
             if s.released_at or not s.appointment or not s.decision or s.appointment["window"] not in windows:
                 continue
             eff = self.effective(s)
+            rated = self.is_rated(s)
             rows.append(
                 Appt(
                     box=s.number,
@@ -709,9 +842,20 @@ class Scenario:
                     step=eff["step"],
                     reefer=s.equipment_type == "reefer",
                     lfd_today=self.lfd_today(s),
+                    rated=rated,
+                    latest_window=self.rated_latest_window if rated else None,
                 )
             )
         return rows
+
+    def _unrated(self, row: Appt) -> Appt:
+        """The same row as it would be with rated order mode off. Rated boxes lose the bonus and the deadline."""
+        if not row.rated:
+            return row
+        state = self.boxes[row.box]
+        base = evaluate(self.box_view(state, rated=False), self.now)
+        step = row.step if state.planner and state.planner["action"] == "override" else base.step
+        return Appt(row.box, row.lane, row.window, base.urgency, step, row.reefer, row.lfd_today)
 
     def missed(self) -> list[str]:
         windows = set(self.open_windows())
@@ -727,8 +871,17 @@ class Scenario:
         if self.gate_cache and self.gate_cache[0] == sig:
             return self.gate_cache[1], self.gate_cache[2]
         plan = solve(rows, lanes, windows, self.capacity)
-        self.gate_cache = (sig, rows, plan)
+        slid: dict[str, tuple[int, str]] = {}
+        if any(a.rated for a in rows):
+            baseline = solve([self._unrated(a) for a in rows], lanes, windows, self.capacity)
+            slid = {box: baseline.placed[box] for box in plan.overflow if box in baseline.placed}
+        self.gate_cache = (sig, rows, plan, slid)
         return rows, plan
+
+    def gate_slid(self) -> dict[str, tuple[int, str]]:
+        """Overflow boxes that held a slot in the plan without rated orders, and the slot they lost."""
+        self.gate_plan()
+        return self.gate_cache[3]
 
     def set_lane(self, lane: int, open_: bool) -> dict:
         if not 1 <= lane <= self.lane_count:
@@ -844,11 +997,27 @@ class Scenario:
                 if target and any(h["name"] == name for h in target.get("holds", [])):
                     target["holds"] = [h for h in target["holds"] if h["name"] != name]
                     target[stamp] = iso(at)
-        elif kind in ("reefer_power_off", "reefer_power_on"):
-            if box.reefer_model is None:
+        elif kind in ("reefer_power_off", "reefer_power_on", "reefer_silent"):
+            model = box.reefer_model
+            if model is None:
                 entry["ignored"] = "not a reefer"
-            elif not box.reefer_model.set_power(at, kind == "reefer_power_on"):
+            elif kind == "reefer_power_off" and not model.set_power(at, False):
                 entry["ignored"] = "power already in that state"
+            elif kind == "reefer_power_on" and not model.restore(at):
+                entry["ignored"] = "power already in that state"
+            elif kind == "reefer_silent":
+                alarm = event.get("alarm")
+                if not (model.fail(at, str(alarm)) if alarm else model.go_silent(at)):
+                    entry["ignored"] = "already silent"
+        elif kind == "circuit_trip":
+            circuit = str(event.get("circuit") or "")
+            members = [s for s in self.circuits.get(circuit, []) if not s.released_at]
+            tripped = [s.number for k, s in enumerate(members) if s.reefer_model.trip(at, at + k * TRIP_STAGGER)]
+            entry["boxes"] = tripped
+            if not members:
+                entry["ignored"] = "no reefers on that circuit"
+            elif not tripped:
+                entry["ignored"] = "circuit already tripped"
         elif kind == "source_dark":
             self.dark_sources.setdefault(event["source"], at)
         elif kind == "source_back":

@@ -22,6 +22,7 @@
     }
   ],
   "synthetic": {"count": 190, "reefer_share": 0.15, "hold_rate": 0.08, "no_show_rate": 0.15, "empty_slot_share": 0.33},
+  "rated_orders": {"deadline": "+05:00", "boxes": ["MSCU3638612", "ONEU3340886", "MSKU8397245", "TCLU4140020", "TCLU1782617", "MSKU5027648"]},
   "events": [
     {"t": "+00:05", "type": "mode", "mode": "harbor_night"},
     {"t": "+00:10", "type": "lanes_down", "lanes": [4, 5, 6]},

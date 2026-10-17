@@ -285,7 +285,7 @@ def test_urgency_is_capped():
 
 
 def test_rules_load_in_id_order_with_created_at():
-    assert [r.id for r in RULES] == [f"R{i}" for i in range(13)]
+    assert [r.id for r in RULES] == [f"R{i}" for i in range(15)]
     assert all(r.created_at for r in RULES)
 
 

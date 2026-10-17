@@ -56,6 +56,12 @@ CALL_OUTCOMES = ("confirmed_empty", "confirmed_loaded", "reschedule_accepted", "
 CALL_CONFIRMS = {"confirmed_empty": "carrier", "confirmed_loaded": "weighbridge"}
 CALL_TRUST_BONUS = 0.2
 
+RATED_BONUS = 50
+REEFER_CREW = "reefer crew"
+SILENCE_KINDS = ("tripped", "telemetry", "failed")
+SILENCE_LABELS = {"tripped": "Tripped circuit", "telemetry": "Telemetry fault", "failed": "Failed unit"}
+SPOOF_HOLD_NAMES = ("customs", "USDA", "VACIS", "line", "freight", "TMF")
+
 
 @dataclass
 class Reading:
@@ -96,6 +102,10 @@ class Box:
     pending_release: bool = False
     live_sources: frozenset[str] = frozenset()
     call_outcome: str | None = None
+    # Gate out deadline, ISO, when rated order mode is on and the box is on the rated list.
+    rated: str | None = None
+    # Other reefers on the same circuit: {number, last_seen, comms_lost_at} from their latest reading.
+    circuit_peers: tuple[dict, ...] = ()
 
     def source(self, name: str) -> dict | None:
         return getattr(self, name)
@@ -115,6 +125,7 @@ class Ctx:
     available: bool | None
     lfd_hours: float | None
     appointment_hours: float | None
+    silence: dict | None = None
 
     def has(self, code: str) -> bool:
         return any(c.code == code for c in self.conflicts)
@@ -189,6 +200,7 @@ class Decision:
     trust_detail: dict[str, Trust] = field(default_factory=dict)
     readings: list[Reading] = field(default_factory=list)
     twist_tag: str | None = None
+    silence: dict | None = None
 
 
 class DecisionIn(BaseModel):
@@ -209,6 +221,20 @@ class CallIn(BaseModel):
 class LaneIn(BaseModel):
     lane: int
     open: bool
+
+
+class RatedIn(BaseModel):
+    on: bool
+
+
+class HoldToggle(BaseModel):
+    name: Literal["customs", "USDA", "VACIS", "line", "freight", "TMF"] = "customs"
+    on: bool
+
+
+class SpoofIn(BaseModel):
+    weight_in_lbs: int | None = Field(None, ge=0, le=150_000)
+    hold: HoldToggle | None = None
 
 
 class SpeedIn(BaseModel):

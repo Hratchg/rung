@@ -6,6 +6,7 @@ import json
 import logging
 import time
 from contextlib import asynccontextmanager
+from datetime import datetime
 
 from fastapi import Body, FastAPI, HTTPException, Request
 
@@ -14,7 +15,23 @@ from .audit import Audit, twist_log
 from .engine import RULES
 from .feeds import warmup
 from .gate import Assignment
-from .models import CALL_OUTCOMES, SOURCE_SPECS, SOURCES, STRENGTH, CallIn, DecisionIn, JumpIn, LaneIn, SpeedIn
+from .gitdiff import TwistDiffs
+from .models import (
+    CALL_OUTCOMES,
+    HOLD_LABELS,
+    SILENCE_LABELS,
+    SOURCE_SPECS,
+    SOURCES,
+    SPOOF_HOLD_NAMES,
+    STRENGTH,
+    CallIn,
+    DecisionIn,
+    JumpIn,
+    LaneIn,
+    RatedIn,
+    SpeedIn,
+    SpoofIn,
+)
 from .scenario import EVENT_TYPES, BoxState, Scenario
 from .t49 import Poller
 from .voice import LIVE_GIVE_UP_SECONDS, OUTCOME_LABELS, POLL_SECONDS, Voice, default_outcome, spell_box
@@ -28,6 +45,7 @@ from .timefmt import (
     say_age,
     say_date,
     say_num,
+    say_time,
 )
 
 log = logging.getLogger("rung.voice")
@@ -40,6 +58,7 @@ LEGEND = {
 scenario = Scenario(audit=Audit(config.AUDIT_PATH))
 poller = Poller(scenario.apply_live)
 voice = Voice()
+twist_diffs = TwistDiffs()
 
 
 def sync_call(number: str, call: dict) -> None:
@@ -84,6 +103,44 @@ app.state.scenario = scenario
 app.state.poller = poller
 
 
+def minutes_since(later: datetime, earlier: datetime) -> int:
+    return max(0, int((later - earlier).total_seconds() // 60))
+
+
+def dark_feed() -> list[dict]:
+    """One banner line per dark feed: scenario source_dark events in scenario minutes, poller failures in real minutes."""
+    sc = scenario
+    out = []
+    for source, since in sorted(sc.dark_sources.items()):
+        minutes = minutes_since(sc.now, since)
+        out.append(
+            {
+                "source": source,
+                "cause": "scenario",
+                "since": iso(since),
+                "minutes": minutes,
+                "text": f"{source.capitalize()} feed dark, {minutes} min",
+                "detail": (
+                    f"The queue keeps running from the snapshot taken at {say_time(since)}. "
+                    f"Boxes that depend on the {source} feed wait, or go to a planner if they were about to leave."
+                ),
+            }
+        )
+    if poller.failing and poller.failing_since:
+        minutes = minutes_since(datetime.now().astimezone(), parse_dt(poller.failing_since))
+        out.append(
+            {
+                "source": "terminal",
+                "cause": "poller",
+                "since": poller.failing_since,
+                "minutes": minutes,
+                "text": f"Terminal feed dark, {minutes} min",
+                "detail": f"{poller.snapshot()['message']} The queue keeps running from the snapshot in fixtures/t49_snapshot.json.",
+            }
+        )
+    return out
+
+
 def state_payload() -> dict:
     sc = scenario
     return {
@@ -107,9 +164,21 @@ def state_payload() -> dict:
             for s in sc.boxes.values()
             if s.reefer_model and not s.released_at and s.reefer_model.power_at(sc.now)
         ),
+        "reefers": [
+            {
+                "number": s.number,
+                "circuit": s.reefer_model.circuit,
+                "power_on": s.reefer_model.power_at(sc.now),
+                "silent": s.reefer_model.silent_since(sc.now) is not None,
+            }
+            for s in sorted(sc.boxes.values(), key=lambda s: s.number)
+            if s.reefer_model and not s.released_at
+        ],
         "event_log": sc.event_log[-10:][::-1],
         "resets": sc.resets,
         "voice": voice.status(),
+        "dark_feed": dark_feed(),
+        "rated": sc.rated_info(),
     }
 
 
@@ -148,6 +217,23 @@ def planned_slot(state: BoxState, plan: Assignment | None) -> dict | None:
     return {"lane": slot[0], "window": slot[1], "label": f"Planned {slot[1]} lane {slot[0]}"}
 
 
+def silence_payload(state: BoxState) -> dict | None:
+    s = state.decision.silence if state.decision else None
+    if not s:
+        return None
+    return {**s, "since": iso(s["since"]), "label": SILENCE_LABELS[s["kind"]]}
+
+
+def rated_clock(state: BoxState) -> dict | None:
+    sc = scenario
+    if not sc.is_rated(state):
+        return None
+    h = hours_between(sc.rated_deadline, sc.now)
+    at = say_time(sc.rated_deadline)
+    tail = f"{say_hours(h)} left" if h >= 0 else f"passed {say_hours(h)} ago"
+    return {"deadline": iso(sc.rated_deadline), "hours": round(h, 1), "label": f"Rated. Gate out by {at}, {tail}"}
+
+
 def clocks(state: BoxState, plan: Assignment | None = None) -> dict:
     sc = scenario
     terminal = state.terminal or {}
@@ -160,10 +246,11 @@ def clocks(state: BoxState, plan: Assignment | None = None) -> dict:
     reading = state.reefer_reading(sc.now)
     if reading:
         power = "Power on" if reading["power_on"] else "Power off"
-        out["reefer"] = {
-            **reading,
-            "label": f"{power}. Product {say_num(reading['product_temp_c'])} C, set {say_num(reading['set_point_c'])} C",
-        }
+        label = f"{power}. Product {say_num(reading['product_temp_c'])} C, set {say_num(reading['set_point_c'])} C"
+        silence = silence_payload(state)
+        if silence:
+            label = f"Silent since {say_time(parse_dt(silence['since']))}. {silence['label']}"
+        out["reefer"] = {**reading, "silent": silence is not None, "label": label}
     appt = state.appointment
     if appt:
         at = parse_dt(appt["at"])
@@ -203,6 +290,7 @@ def queue_row(state: BoxState, plan: Assignment | None = None) -> dict:
         "conflicts": eff["conflicts"],
         "planner": eff["planner"],
         "live": state.live,
+        "rated": rated_clock(state),
         "dray_carrier": (state.appointment or {}).get("dray_carrier"),
         "clocks": clocks(state, plan),
         "badges": {name: badge(state, name) for name in SOURCES},
@@ -233,6 +321,17 @@ def get_queue(carrier: str = "", step: str = "") -> list[dict]:
         rows = [r for r in rows if r["step"] == step.upper()]
     rows.sort(key=sort_key)
     return rows
+
+
+def spoof_info(state: BoxState) -> dict:
+    holds = (state.customs or {}).get("holds", []) + (state.terminal or {}).get("holds", [])
+    active = {h["name"] for h in holds if h.get("status") == "hold"}
+    return {
+        "available": state.released_at is None,
+        "weight_in_lbs": (state.carrier or {}).get("weight_in_lbs"),
+        "holds": [{"name": n, "label": HOLD_LABELS[n], "active": n in active} for n in SPOOF_HOLD_NAMES],
+        "spoofed": dict(state.spoofed),
+    }
 
 
 @app.get("/api/box/{number}")
@@ -300,6 +399,9 @@ def get_box(number: str) -> dict:
             "clocks": clocks(state, scenario.gate_plan()[1]),
             "warmup": warmup(state.reefer_model, scenario.now) if state.reefer_model else None,
             "history": scenario.audit.lines(box=number),
+            "rated": rated_clock(state),
+            "silence": silence_payload(state),
+            "spoof": spoof_info(state),
             "call": call_payload(state),
             "ask": {
                 "available": state.released_at is None,
@@ -309,6 +411,17 @@ def get_box(number: str) -> dict:
                 "weight_case": state.weight_case,
             },
         }
+
+
+@app.post("/api/box/{number}/spoof")
+def post_spoof(number: str, body: SpoofIn) -> dict:
+    hold = (body.hold.name, body.hold.on) if body.hold else None
+    try:
+        return scenario.spoof(number.strip().upper(), body.weight_in_lbs, hold)
+    except KeyError:
+        raise HTTPException(404, f"Box {number} not found.")
+    except ValueError as exc:
+        raise HTTPException(409, str(exc))
 
 
 @app.post("/api/decision")
@@ -328,6 +441,36 @@ def say_list(items: list) -> str:
     return f"{', '.join(items[:-1])} and {items[-1]}"
 
 
+def rated_rows(plan: Assignment, by_box: dict) -> list[dict]:
+    """Where each rated order stands tonight, while rated order mode is on."""
+    sc = scenario
+    if not sc.rated_on:
+        return []
+    latest = sc.rated_latest_window
+    order = {w: i for i, w in enumerate(sc.windows)}
+    out = []
+    for number in sc.rated_boxes:
+        state = sc.boxes[number]
+        slot = plan.placed.get(number)
+        if state.released_at:
+            status, text = "released", f"Released at {say_time(state.released_at)}."
+        elif slot:
+            on_time = latest is not None and order[slot[1]] <= order[latest]
+            status = "on_time" if on_time else "late"
+            text = f"Planned {slot[1]} lane {slot[0]}. " + ("Gates out before the deadline." if on_time else "Misses the deadline.")
+        elif number in plan.overflow:
+            status, text = "overflow", "No slot before the deadline."
+        elif number in plan.held:
+            status, text = "held", "On HOLD. Takes no slot until the hold clears."
+        elif state.appointment:
+            status, text = "missed", f"Booked {state.appointment['window']}, a window that has ended."
+        else:
+            status, text = "no_appointment", "No appointment booked."
+        a = by_box.get(number)
+        out.append({"box": number, "status": status, "text": text, "urgency": a.urgency if a else state.decision.urgency})
+    return out
+
+
 def gate_payload() -> dict:
     sc = scenario
     rows, plan = sc.gate_plan()
@@ -341,9 +484,21 @@ def gate_payload() -> dict:
     else:
         full = f"Lanes {say_list(plan.lanes_open)} are full."
     owners = {a.box: sc.effective(sc.boxes[a.box])["owner"] for a in rows if a.step == "HOLD"}
+    slid = sc.gate_slid()
+    deadline = say_time(sc.rated_deadline) if sc.rated_deadline else ""
 
     def chip(a) -> dict:
-        return {"box": a.box, "urgency": a.urgency, "step": a.step, "reefer": a.reefer, "lfd_today": a.lfd_today}
+        return {"box": a.box, "urgency": a.urgency, "step": a.step, "reefer": a.reefer, "lfd_today": a.lfd_today, "rated": a.rated}
+
+    def overflow_reason(a) -> str:
+        if a.rated and a.latest_window in windows:
+            reason = f"No open slot from {a.window} to {a.latest_window}, the last window before the {deadline} gate out deadline. {full}"
+        else:
+            reason = f"No open slot from {a.window} to {windows[-1]}. {full}"
+        if a.box in slid:
+            lane, window = slid[a.box]
+            reason += f" Slid when rated orders took the slots. Without them it had {window} lane {lane}."
+        return reason
 
     placed = {
         box: {**chip(by_box[box]), "lane": lane, "window": window, "moved": box in moved_boxes}
@@ -354,7 +509,9 @@ def gate_payload() -> dict:
             **chip(by_box[box]),
             "lane": by_box[box].lane,
             "window": by_box[box].window,
-            "reason": f"No open slot from {by_box[box].window} to {windows[-1]}. {full}",
+            "slid": box in slid,
+            "slid_from": {"lane": slid[box][0], "window": slid[box][1]} if box in slid else None,
+            "reason": overflow_reason(by_box[box]),
         }
         for box in plan.overflow
     ]
@@ -388,6 +545,7 @@ def gate_payload() -> dict:
         "overflow": overflow,
         "held": held,
         "missed": sc.missed(),
+        "rated": {**sc.rated_info(), "slid": len(slid), "rows": rated_rows(plan, by_box)},
         "solve_ms": plan.solve_ms,
         "solver": plan.solver,
         "error": plan.error,
@@ -524,10 +682,11 @@ async def post_retell_record(request: Request) -> dict:
 
 
 @app.get("/api/audit")
-def get_audit(since: str = "", box: str = "", limit: int = 0) -> dict:
+def get_audit(since: str = "", box: str = "", limit: int = 0, diff: bool = False) -> dict:
+    git = twist_diffs.commits()
     with scenario.lock:
         scenario.advance()
-        twists = twist_log(scenario.twists, RULES, config.TWIST_LOG_PATH)
+        twists = twist_log(scenario.twists, RULES, config.TWIST_LOG_PATH, git, patches=diff)
     return {
         "lines": scenario.audit.lines(since or None, box.strip().upper() or None, max(0, limit)),
         "total": len(scenario.audit.buffer),
@@ -559,6 +718,16 @@ def post_event(event: dict = Body(...)) -> dict:
         raise HTTPException(400, f"Bad event: {exc}")
     with scenario.lock:
         return {**state_payload(), "applied": entry}
+
+
+@app.post("/api/scenario/rated")
+def post_rated(body: RatedIn) -> dict:
+    try:
+        scenario.set_rated(body.on)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc))
+    with scenario.lock:
+        return state_payload()
 
 
 @app.post("/api/scenario/speed")

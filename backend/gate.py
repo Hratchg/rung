@@ -2,9 +2,10 @@
 
 solve() places appointments into slot units (lane, window, k) over open lanes with
 scipy's linear_sum_assignment, falling back to a greedy urgency sort if the solver fails.
-Protected boxes (reefers and last free day boxes not on HOLD) are solved first, then the
-rest take the units left. Pairs that carry the penalty are never kept, so HOLD boxes go to
-held and boxes with no feasible unit go to overflow. It is pure: no clock reads and no shared state.
+Protected boxes (reefers, last free day boxes, and rated orders, none on HOLD) are solved first,
+then the rest take the units left. Pairs that carry the penalty are never kept, so HOLD boxes go to
+held and boxes with no feasible unit go to overflow. A rated order may not take a window later than
+its latest window, the last one that gates out before its deadline. It is pure: no clock reads and no shared state.
 """
 from __future__ import annotations
 
@@ -29,6 +30,8 @@ class Appt:
     step: str = "RELEASE"
     reefer: bool = False
     lfd_today: bool = False
+    rated: bool = False
+    latest_window: str | None = None
 
 
 @dataclass
@@ -76,8 +79,14 @@ def _units(lanes_open: list[int], windows: list[str], capacity: int) -> list[tup
     return [(lane, w, k) for lane in sorted(lanes_open) for w in windows for k in range(capacity)]
 
 
+def _latest_hours(a: Appt, hours: dict[str, float]) -> float:
+    """A latest window that has already ended drops the bound, so a late rated order still gets a slot."""
+    return hours.get(a.latest_window, np.inf) if a.latest_window else np.inf
+
+
 def _cost_matrix(appts: list[Appt], units, hours: dict[str, float], lanes_open: set[int]) -> np.ndarray:
     a_hours = np.array([hours.get(a.window, 0.0) for a in appts])[:, None]
+    a_latest = np.array([_latest_hours(a, hours) for a in appts])[:, None]
     a_weight = np.array([101 - a.urgency for a in appts], dtype=float)[:, None]
     a_lane = np.array([a.lane for a in appts])[:, None]
     a_hold = np.array([a.step == "HOLD" for a in appts])[:, None]
@@ -87,13 +96,13 @@ def _cost_matrix(appts: list[Appt], units, hours: dict[str, float], lanes_open: 
     delay = u_hours - a_hours
     cost = np.maximum(delay, 0.0) * a_weight
     # One flat penalty per infeasible pair, so the solver minimises how many it is forced to make.
-    infeasible = (delay < 0) | a_hold | u_closed
+    infeasible = (delay < 0) | a_hold | u_closed | (u_hours > a_latest)
     return cost + PENALTY * infeasible + LANE_CHANGE_COST * (u_lane != a_lane)
 
 
 def protected(a: Appt) -> bool:
-    """Reefers and last free day boxes must keep a slot. HOLD boxes cannot leave, so they are not protected."""
-    return (a.reefer or a.lfd_today) and a.step != "HOLD"
+    """Reefers, last free day boxes, and rated orders must keep a slot. HOLD boxes cannot leave, so they are not protected."""
+    return (a.reefer or a.lfd_today or a.rated) and a.step != "HOLD"
 
 
 def _tiers(appts: list[Appt]) -> list[list[int]]:

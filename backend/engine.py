@@ -1,15 +1,16 @@
 """Decision engine. evaluate(box, now) is pure: no clock reads, no randomness, no I/O."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from .feeds import cargo_kind
+from .feeds import DRAW_BAND_KW, cargo_kind
 from .models import (
     CALL_CONFIRMS,
     CALL_TRUST_BONUS,
     CUSTOMS_HOLD_NAMES,
     HOLD_OWNERS,
     HOLD_PRIORITY,
+    RATED_BONUS,
     SOURCE_SPECS,
     SOURCES,
     STRENGTH,
@@ -35,6 +36,54 @@ STEP_SENTENCE = {
     "HAND": "A planner must decide now.",
 }
 FALLBACK_SENTENCE = "No rule matched this box."
+
+# A reefer is silent once contact is lost, or once its newest reading is older than the C3 threshold.
+SILENT_AFTER_H = 2.0
+TRIP_WINDOW = timedelta(minutes=10)
+# "Several units" on one circuit: this unit plus at least two others.
+TRIP_MIN_UNITS = 3
+
+
+def silent_since(reading: dict | None, now: datetime) -> datetime | None:
+    if not reading:
+        return None
+    lost = parse_dt(reading.get("comms_lost_at"))
+    if lost and lost <= now:
+        return lost
+    seen = parse_dt(reading.get("last_seen"))
+    if seen and hours_between(now, seen) > SILENT_AFTER_H:
+        return seen
+    return None
+
+
+def classify_silence(box: Box, now: datetime) -> dict | None:
+    """Why a reefer went quiet, from its last heard reading and its circuit peers.
+
+    tripped: several units on the same circuit silent within 10 minutes.
+    failed: the last reading carried an alarm, or a draw outside the normal band.
+    telemetry: a single unit silent with normal draw before.
+    It reads the last heard reading even when the reefer source is dark, because that reading is the evidence.
+    """
+    reading = box.reefer
+    since = silent_since(reading, now)
+    if since is None:
+        return None
+    peers = sorted(
+        p["number"]
+        for p in box.circuit_peers
+        if (other := silent_since(p, now)) is not None and abs(other - since) <= TRIP_WINDOW
+    )
+    circuit = reading.get("circuit")
+    draw = reading.get("draw_kw")
+    alarm = reading.get("alarm")
+    abnormal = draw is not None and not (DRAW_BAND_KW[0] <= float(draw) <= DRAW_BAND_KW[1])
+    if circuit and len(peers) + 1 >= TRIP_MIN_UNITS:
+        kind = "tripped"
+    elif alarm or abnormal:
+        kind = "failed"
+    else:
+        kind = "telemetry"
+    return {"kind": kind, "since": since, "circuit": circuit, "peers": peers, "draw_kw": draw, "alarm": alarm}
 
 
 def _source_status(box: Box, now: datetime):
@@ -196,8 +245,8 @@ def _trust(present, readings, ages, dark, conflicts, call_outcome: str | None = 
     return out
 
 
-def _urgency(readings, active, pending, lfd_hours, appt_hours) -> int:
-    points = 0.0
+def _urgency(readings, active, pending, lfd_hours, appt_hours, rated: bool = False) -> int:
+    points = float(RATED_BONUS) if rated else 0.0
     reefer = readings.get("reefer")
     if reefer:
         sp = float(reefer["set_point_c"])
@@ -253,7 +302,7 @@ def build_ctx(box: Box, now: datetime) -> tuple[Ctx, dict[str, Trust], list[Read
     appt_hours = hours_between(appt_at, now) if appt_at else None
     conflicts = _conflicts(box, now, readings, ages, dark, active, pending, available, lfd, lfd_hours)
     trust = _trust(present, readings, ages, dark, conflicts, box.call_outcome)
-    urgency = _urgency(readings, active, pending, lfd_hours, appt_hours)
+    urgency = _urgency(readings, active, pending, lfd_hours, appt_hours, box.rated is not None)
     ctx = Ctx(
         box=box,
         now=now,
@@ -267,6 +316,7 @@ def build_ctx(box: Box, now: datetime) -> tuple[Ctx, dict[str, Trust], list[Read
         available=available,
         lfd_hours=lfd_hours,
         appointment_hours=appt_hours,
+        silence=classify_silence(box, now),
     )
     return ctx, trust, _readings_list(box, readings, observed)
 
@@ -345,4 +395,5 @@ def evaluate(box: Box, now: datetime, rules: list[Rule] | None = None) -> Decisi
         trust_detail=trust,
         readings=readings,
         twist_tag=next((rule.twist_tag for rule in fired if rule.twist_tag), None),
+        silence=ctx.silence,
     )

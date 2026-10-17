@@ -57,8 +57,17 @@ def load_twist_file(path: Path | None) -> list[dict]:
     return data if isinstance(data, list) else []
 
 
-def twist_log(scenario_twists: list[dict], rules: list, path: Path | None) -> list[dict]:
-    """One row per twist tag, newest first, joining scenario twist events, twists.json, and tagged rule files."""
+def twist_log(
+    scenario_twists: list[dict],
+    rules: list,
+    path: Path | None,
+    git: dict[str, list[dict]] | None = None,
+    patches: bool = True,
+) -> list[dict]:
+    """One row per twist tag, newest first, joining scenario twist events, twists.json, tagged rule files, and git.
+
+    git maps a tag to its "twist: <tag>" commits, or is None when the project has no git repo.
+    """
     rows: dict[str, dict] = {}
 
     def row(tag: str) -> dict:
@@ -88,8 +97,16 @@ def twist_log(scenario_twists: list[dict], rules: list, path: Path | None) -> li
             {"kind": "rule", "id": rule.id, "name": rule.name, "file": rule.file, "created_at": rule.created_at}
         )
         r["merged_at"] = r["merged_at"] or rule.created_at
+    for tag in git or {}:
+        row(tag)
     for r in rows.values():
-        r["status"] = "merged" if r["added"] else "received"
+        commits = (git or {}).get(r["tag"], [])
+        if not patches:
+            commits = [{k: v for k, v in c.items() if k != "patch"} for c in commits]
+        r["git"] = {"available": git is not None, "commits": commits}
+        if commits and not r["merged_at"]:
+            r["merged_at"] = commits[-1]["date"]
+        r["status"] = "merged" if r["added"] or commits else "received"
     return sorted(rows.values(), key=lambda r: r["received_at"] or r["received_wall"] or r["merged_at"] or "", reverse=True)
 
 

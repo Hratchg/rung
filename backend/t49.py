@@ -46,6 +46,7 @@ STATUS_TEXT = {
     "error": "Terminal49 unreachable. Running on the fixture.",
     "ok": "Terminal49 live.",
 }
+FAILING = ("unauthorized", "error")
 
 
 def headers(key: str) -> dict:
@@ -91,6 +92,12 @@ class Poller:
         self.last_payload: dict | None = None
         self.last_live = False
         self._warned_401 = False
+        # Wall time of the first failed poll in the current run of failures. No key is not a failure.
+        self.failing_since: str | None = None
+
+    @property
+    def failing(self) -> bool:
+        return self.status in FAILING
 
     def snapshot(self) -> dict:
         return {
@@ -98,9 +105,14 @@ class Poller:
             "last_ok": self.last_ok,
             "status": self.status,
             "message": STATUS_TEXT.get(self.status, self.status),
+            "failing_since": self.failing_since,
         }
 
     def _fallback(self, status: str) -> None:
+        if status in FAILING and not self.failing:
+            self.failing_since = datetime.now().astimezone().isoformat(timespec="seconds")
+        elif status not in FAILING:
+            self.failing_since = None
         self.status = status
         payload = load_fixture(self.fixture)
         self.last_payload, self.last_live = payload, False
@@ -127,6 +139,7 @@ class Poller:
             self.last_payload, self.last_live = payload, True
             self.live_count = self.apply(payload, True)
             self.status = "ok"
+            self.failing_since = None
             self.last_ok = datetime.now().astimezone().isoformat(timespec="seconds")
         except (httpx.HTTPError, ValueError) as exc:
             log.warning("Terminal49 poll failed: %s", exc)
