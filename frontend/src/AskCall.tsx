@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useStartCall, type AuditLine, type BoxDetail, type CallOutcome, type TranscriptLine } from './api'
+import { useStartCall, type AuditLine, type BoxDetail, type CallOutcome, type CallStart, type TranscriptLine } from './api'
 import { sayTime } from './format'
 
 const STATUS: Record<string, string> = {
@@ -39,7 +39,7 @@ export default function AskCall({ box }: { box: BoxDetail }) {
   const transcript = live && live.transcript.length > (call?.transcript.length ?? 0) ? live.transcript : (call?.transcript ?? [])
   const effect = call ? box.history.find((h: AuditLine) => h.action === 'call_outcome' && h.call_id === call.call_id)?.effect : undefined
 
-  async function startWebCall(token: string) {
+  async function startWebCall(res: CallStart & { access_token: string }) {
     setLive({ status: 'connecting', transcript: [] })
     try {
       const { RetellWebClient } = await import('retell-client-js-sdk')
@@ -57,7 +57,12 @@ export default function AskCall({ box }: { box: BoxDetail }) {
         setLive((l) => ({ status: 'error', transcript: l?.transcript ?? [], error: String(e) }))
         web.stopCall()
       })
-      await web.startCall({ accessToken: token })
+      await web.startCall({
+        accessToken: res.access_token,
+        callId: res.call_id,
+        transport: res.transport ?? undefined,
+        iceServers: res.ice_servers.length ? res.ice_servers : undefined,
+      })
     } catch (e) {
       setLive((l) => ({ status: 'error', transcript: l?.transcript ?? [], error: e instanceof Error ? e.message : String(e) }))
     }
@@ -66,7 +71,7 @@ export default function AskCall({ box }: { box: BoxDetail }) {
   function ask() {
     start.mutate(box.ask.mode === 'mock' ? answer : null, {
       onSuccess: (res) => {
-        if (res.mode === 'web' && !res.mock && res.access_token) void startWebCall(res.access_token)
+        if (res.mode === 'web' && !res.mock && res.access_token) void startWebCall({ ...res, access_token: res.access_token })
       },
     })
   }

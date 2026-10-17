@@ -9,6 +9,7 @@ from backend.engine import evaluate
 from backend.main import app, scenario
 from backend.voice import MOCK_LINE_SECONDS, MockCalls, Voice, VoiceSettings, normalize, script
 
+ICE = {"urls": "turn:turn.example:3478", "username": "u1", "credential": "turn_secret_1"}
 VARIABLE_KEYS = {"container_number", "manifest_weight_lbs", "measured_weight_lbs", "appointment_time", "trucker_name", "dray_carrier"}
 
 
@@ -28,7 +29,7 @@ class FakeCalls:
 
     def create_web_call(self, **kw):
         self.web.append(kw)
-        return SimpleNamespace(call_id="call_live_1", access_token="tok_live_1")
+        return SimpleNamespace(call_id="call_live_1", access_token="tok_live_1", transport="gateway", ice_servers=[ICE])
 
     def create_phone_call(self, **kw):
         self.phone.append(kw)
@@ -164,7 +165,9 @@ def test_live_web_call_uses_create_web_call_with_string_variables(client, monkey
     monkeypatch.setattr(main, "voice", Voice(settings, client=fake))
     heavy = box_with("heavy")
     r = client.post(f"/api/call/{heavy}").json()
-    assert r == {"call_id": "call_live_1", "access_token": "tok_live_1", "mode": "web", "mock": False}
+    assert r == {"call_id": "call_live_1", "access_token": "tok_live_1", "transport": "gateway", "ice_servers": [ICE], "mode": "web", "mock": False}
+    assert "turn_secret_1" not in json.dumps(scenario.boxes[heavy].call)
+    assert "turn_secret_1" not in json.dumps(client.get("/api/audit", params={"box": heavy}).json())
     kw = fake.call.web[0]
     assert kw["agent_id"] == "agent_test"
     assert kw["metadata"] == {"box": heavy}

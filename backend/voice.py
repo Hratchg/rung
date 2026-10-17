@@ -227,7 +227,16 @@ class Voice:
             retell_llm_dynamic_variables=variables,
             metadata=metadata,
         )
-        return {"call_id": resp.call_id, "access_token": resp.access_token, "mode": "web", "mock": False}
+        # The browser needs the transport and ICE servers to join a gateway call. They carry
+        # short lived TURN credentials, so they go to the browser only and are never stored.
+        return {
+            "call_id": resp.call_id,
+            "access_token": resp.access_token,
+            "transport": getattr(resp, "transport", None),
+            "ice_servers": [_as_dict(s) for s in getattr(resp, "ice_servers", None) or []],
+            "mode": "web",
+            "mock": False,
+        }
 
     def retrieve(self, call_id: str, mock: bool) -> dict:
         if mock:

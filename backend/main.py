@@ -601,7 +601,14 @@ def post_call(number: str, body: CallIn | None = None) -> dict:
     except Exception as exc:
         raise HTTPException(502, f"Retell refused the call: {exc}")
     scenario.call_started(number, info, variables)
-    return {"call_id": info["call_id"], "access_token": info["access_token"], "mode": info["mode"], "mock": info["mock"]}
+    return {
+        "call_id": info["call_id"],
+        "access_token": info["access_token"],
+        "transport": info.get("transport"),
+        "ice_servers": info.get("ice_servers") or [],
+        "mode": info["mode"],
+        "mock": info["mock"],
+    }
 
 
 STEP_SPOKEN = {

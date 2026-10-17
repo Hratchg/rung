@@ -236,7 +236,14 @@ export type AskInfo = {
   weight_case: string | null
 }
 
-export type CallStart = { call_id: string; access_token: string | null; mode: 'web' | 'phone'; mock: boolean }
+export type CallStart = {
+  call_id: string
+  access_token: string | null
+  transport: 'livekit' | 'gateway' | null
+  ice_servers: RTCIceServer[]
+  mode: 'web' | 'phone'
+  mock: boolean
+}
 
 export type BoxDetail = {
   number: string
