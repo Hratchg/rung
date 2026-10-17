@@ -17,9 +17,12 @@ from pathlib import Path
 from stdnum import iso6346
 
 from . import config
-from .feeds import ReeferModel, reefer_model, weighbridge_reading
-from .models import CUSTOMS_HOLD_NAMES, Box
-from .timefmt import format_offset, iso, parse_date, parse_dt, parse_offset, window_at
+from .audit import Audit, decision_line
+from .engine import evaluate
+from .feeds import ReeferModel, cargo_kind, reefer_model, weighbridge_reading
+from .models import CUSTOMS_HOLD_NAMES, STEPS, Box, Decision
+from .t49 import map_container
+from .timefmt import format_offset, hours_between, iso, lfd_deadline, parse_date, parse_dt, parse_offset, window_at
 
 OWNER_CODES = ("MSKU", "TCLU", "CMAU", "HLBU", "ONEU", "MSCU")
 DRAY_CARRIERS = (
@@ -256,21 +259,42 @@ class BoxState:
     live_sources: set[str] = field(default_factory=set)
     weight_asked: bool = False
     pending_release: bool = False
+    decision: Decision | None = None
+    signature: tuple | None = None
+    planner: dict | None = None
+    released_at: datetime | None = None
+    demurrage_avoided: float = 0.0
 
     def reefer_reading(self, now: datetime) -> dict | None:
         return self.reefer_model.reading(now) if self.reefer_model else None
 
+    @property
+    def equipment_type(self) -> str:
+        return (self.carrier or {}).get("equipment_type") or ("reefer" if self.reefer_model else "dry")
+
+
+def _signature(d: Decision) -> tuple:
+    return (d.step, d.hand, tuple(d.fired), tuple(c.code for c in d.conflicts), d.owner)
+
 
 class Scenario:
-    def __init__(self, path: Path | None = None, minutes_per_second: float | None = None):
+    def __init__(
+        self,
+        path: Path | None = None,
+        minutes_per_second: float | None = None,
+        audit: Audit | None = None,
+    ):
         self.path = Path(path or config.SCENARIO_PATH)
         self.lock = threading.RLock()
         self.speed = config.MINUTES_PER_SECOND if minutes_per_second is None else minutes_per_second
+        self.audit = audit or Audit(None)
+        self.live_payload: tuple[dict, bool] | None = None
         self.resets = 0
         self.reset()
 
     def reset(self) -> None:
         with self.lock:
+            self.audit.clear()
             cfg = load_config(self.path)
             self.cfg = cfg
             self.seed = int(cfg["seed"])
@@ -298,6 +322,8 @@ class Scenario:
             self.clock = Clock(self.start, self.speed)
             self.now = self.start
             self.resets += 1
+            if self.live_payload:
+                self._overlay(*self.live_payload)
             self._advance_to(self.start)
 
     def _box_state(self, c: dict) -> BoxState:
@@ -355,7 +381,179 @@ class Scenario:
         self.after_advance()
 
     def after_advance(self) -> None:
-        """Evaluation hook. Phase 1 evaluates every box here."""
+        for state in self.boxes.values():
+            if state.released_at is None:
+                self._evaluate(state)
+
+    def _evaluate(self, state: BoxState) -> Decision:
+        d = evaluate(self.box_view(state), self.now)
+        sig = _signature(d)
+        if sig != state.signature:
+            previous = state.decision.step if state.decision else None
+            self.audit.write(decision_line(d, iso(self.now), previous))
+            if state.planner and state.planner["engine_step"] != d.step:
+                state.planner = None
+            state.signature = sig
+        state.decision = d
+        if d.step == "RELEASE":
+            state.pending_release = True
+        elif not ("R10" in d.fired and state.pending_release):
+            state.pending_release = False
+        return d
+
+    def effective(self, state: BoxState) -> dict:
+        d = state.decision
+        step, hand, reason, owner = d.step, d.hand, d.reason, d.owner
+        planner = state.planner
+        if planner and planner["action"] == "override":
+            step = planner["step"]
+            hand = False
+            reason = f"{reason} Planner override to {step}."
+            if planner.get("note"):
+                reason += f" Note: {planner['note']}"
+            if step == "HOLD" and not owner:
+                owner = "planner"
+        if state.released_at:
+            step = "RELEASE"
+        return {
+            "box": state.number,
+            "step": step,
+            "engine_step": d.step,
+            "hand": hand,
+            "urgency": d.urgency,
+            "fired": d.fired,
+            "conflicts": [c.code for c in d.conflicts],
+            "trust": d.trust,
+            "reason": reason,
+            "owner": owner,
+            "pinned": d.pinned,
+            "planner": planner,
+            "released_at": iso(state.released_at),
+        }
+
+    def planner_action(self, number: str, action: str, step: str | None, note: str) -> dict:
+        with self.lock:
+            self.advance()
+            state = self.boxes.get(number)
+            if state is None:
+                raise KeyError(number)
+            if state.released_at:
+                raise ValueError("Box already released.")
+            d = state.decision
+            before = self.effective(state)["step"]
+            if action == "approve":
+                if d.step == "HAND":
+                    raise ValueError("A HAND decision needs a step. Use override and pick one.")
+                chosen = d.step
+            else:
+                if step not in STEPS:
+                    raise ValueError("Override needs a step.")
+                chosen = step
+            overridden = chosen != d.step
+            effect = self._act(state, chosen, d)
+            self.audit.write(
+                decision_line(
+                    d,
+                    iso(self.now),
+                    before,
+                    actor="planner",
+                    step=chosen,
+                    override=overridden,
+                    note=note,
+                    action=action,
+                    effect=effect,
+                )
+            )
+            if state.released_at is None:
+                state.planner = {
+                    "action": "override" if overridden else "approve",
+                    "step": chosen,
+                    "note": note,
+                    "engine_step": d.step,
+                    "at": iso(self.now),
+                }
+                self._evaluate(state)
+            return self.effective(state)
+
+    def _act(self, state: BoxState, step: str, d: Decision) -> str:
+        if step == "RELEASE":
+            state.released_at = self.now
+            state.pending_release = False
+            state.demurrage_avoided = self._demurrage_avoided(state)
+            return "Released at the gate."
+        if step == "ASK":
+            if "C2" in [c.code for c in d.conflicts] or "R2" in d.fired:
+                return self._repoll(state)
+            if "C1" in [c.code for c in d.conflicts]:
+                state.weight_asked = True
+                return "Weight ask sent. Reweigh requested."
+            return "Ask recorded."
+        return f"{step} recorded."
+
+    def _repoll(self, state: BoxState) -> str:
+        if "terminal" in self.dark_sources:
+            return "Terminal feed is dark. Poll returned nothing."
+        if state.live:
+            return "Live record polls again on the next Terminal49 cycle."
+        holds = (state.customs or {}).get("holds", []) + (state.terminal or {}).get("holds", [])
+        active = any(h.get("status") == "hold" for h in holds)
+        state.terminal["available_for_pickup"] = not active
+        state.terminal["terminal_checked_at"] = iso(self.now)
+        return "Terminal record polled again."
+
+    def _demurrage_avoided(self, state: BoxState) -> float:
+        terminal = state.terminal or {}
+        lfd = parse_date(terminal.get("pickup_lfd"))
+        accruing = any(f.get("type") == "demurrage" and f.get("amount", 0) > 0 for f in terminal.get("fees_at_pod_terminal") or [])
+        near = lfd is not None and hours_between(lfd_deadline(lfd, self.tz), self.now) <= 24
+        return float(daily_demurrage(state.equipment_type)) if (accruing or near) else 0.0
+
+    def counters(self) -> dict:
+        released = [s for s in self.boxes.values() if s.released_at]
+        powered = lost = 0
+        for s in self.boxes.values():
+            if not s.reefer_model or s.released_at:
+                continue
+            reading = s.reefer_reading(self.now)
+            if reading["power_on"]:
+                powered += 1
+            limit = 8.0 if cargo_kind(reading["set_point_c"]) == "frozen" else 4.0
+            if reading["product_temp_c"] - reading["set_point_c"] >= limit:
+                lost += 1
+        due = [s for s in self.boxes.values() if s.appointment and parse_dt(s.appointment["at"]) <= self.now]
+        released_due = [s for s in due if s.released_at]
+        return {
+            "released": len(released),
+            "released_blunt": 0,
+            "reefers_powered": powered,
+            "reefers_lost": lost,
+            "demurrage_avoided_usd": round(sum(s.demurrage_avoided for s in released)),
+            "throughput_pct": round(100 * len(released_due) / len(due)) if due else 0,
+        }
+
+    def apply_live(self, payload: dict, live: bool) -> int:
+        with self.lock:
+            self.live_payload = (payload, live)
+            count = self._overlay(payload, live)
+            self.after_advance()
+            return count
+
+    def _overlay(self, payload: dict, live: bool) -> int:
+        count = 0
+        for resource in payload.get("data") or []:
+            mapped = map_container(resource, iso(self.now))
+            if not mapped:
+                continue
+            state = self.boxes.get(mapped["number"])
+            if state is None:
+                state = self._box_state({"number": mapped["number"], "live": live})
+                self.boxes[state.number] = state
+            for name in ("carrier", "terminal", "customs"):
+                setattr(state, name, mapped[name])
+            state.live = live
+            state.live_sources = {"carrier", "terminal", "customs"} if live else set()
+            count += 1
+        return count
 
     def jump(self, t: str) -> None:
         with self.lock:
@@ -407,8 +605,8 @@ class Scenario:
         elif kind in ("reefer_power_off", "reefer_power_on"):
             if box.reefer_model is None:
                 entry["ignored"] = "not a reefer"
-            else:
-                box.reefer_model.set_power(at, kind == "reefer_power_on")
+            elif not box.reefer_model.set_power(at, kind == "reefer_power_on"):
+                entry["ignored"] = "power already in that state"
         elif kind == "source_dark":
             self.dark_sources.setdefault(event["source"], at)
         elif kind == "source_back":

@@ -40,6 +40,16 @@ HOLD_OWNERS = {
     "other": "terminal",
 }
 HOLD_PRIORITY = ("customs", "VACIS", "USDA", "line", "freight", "TMF", "other")
+HOLD_LABELS = {
+    "customs": "Customs",
+    "USDA": "USDA",
+    "VACIS": "VACIS",
+    "line": "Line",
+    "freight": "Freight",
+    "TMF": "TMF",
+    "other": "Terminal",
+}
+WEIGHT_OWNER = "shipping line"
 
 
 @dataclass
@@ -92,7 +102,7 @@ class Ctx:
     readings: dict[str, dict]
     ages_h: dict[str, float | None]
     dark: list[str]
-    conflicts: dict[str, Conflict]
+    conflicts: list[Conflict]
     urgency: int
     active_holds: list[dict]
     pending_holds: list[dict]
@@ -101,12 +111,24 @@ class Ctx:
     appointment_hours: float | None
 
     def has(self, code: str) -> bool:
-        return code in self.conflicts
+        return any(c.code == code for c in self.conflicts)
+
+    def codes(self) -> set[str]:
+        return {c.code for c in self.conflicts}
 
     @property
     def is_reefer(self) -> bool:
         carrier = self.box.carrier or {}
         return carrier.get("equipment_type") == "reefer" or self.box.reefer is not None
+
+    @property
+    def depends_on(self) -> set[str]:
+        """Sources whose silence blocks a decision. Carrier and weighbridge only feed the weight check."""
+        return {"terminal", "customs"} | ({"reefer"} if self.is_reefer else set())
+
+    @property
+    def dark_dependencies(self) -> list[str]:
+        return [s for s in self.dark if s in self.depends_on]
 
     @property
     def lane_closed(self) -> bool:
@@ -128,6 +150,8 @@ class Rule:
     why: Callable[[Ctx], str]
     hand: bool = False
     pin: bool = False
+    uses: tuple[str, ...] = ()
+    owner: Callable[[Ctx], str | None] | None = None
     twist_tag: str | None = None
     created_at: str = ""
 
@@ -152,6 +176,7 @@ class Decision:
     reason: str
     owner: str | None
     pinned: bool = False
+    votes: dict[str, str] = field(default_factory=dict)
     trust_detail: dict[str, Trust] = field(default_factory=dict)
     readings: list[Reading] = field(default_factory=list)
     twist_tag: str | None = None
