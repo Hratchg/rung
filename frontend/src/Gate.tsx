@@ -1,0 +1,319 @@
+import { useMemo, type ReactNode } from 'react'
+import { useGate, useLaneToggle, type Gate, type GateChip } from './api'
+import { laneList, sayHours } from './format'
+import { Notice } from './Queue'
+import { StepChip } from './ui'
+
+const TAGS = [
+  { key: 'reefer', letter: 'R', label: 'Reefer', className: 'bg-sky-700 text-white' },
+  { key: 'lfd_today', letter: 'L', label: 'Last free day today or past', className: 'bg-amber-400 text-amber-950' },
+  { key: 'moved', letter: 'M', label: 'Moved by Rung', className: 'bg-violet-700 text-white' },
+] as const
+
+type Tagged = Pick<GateChip, 'reefer' | 'lfd_today'> & { moved?: boolean }
+
+function Tags({ chip }: { chip: Tagged }) {
+  const on = TAGS.filter((t) => chip[t.key])
+  if (on.length === 0) return null
+  return (
+    <span className="flex gap-0.5">
+      {on.map((t) => (
+        <span key={t.key} title={t.label} aria-label={t.label} className={`rounded px-1 text-base font-bold leading-6 ${t.className}`}>
+          {t.letter}
+        </span>
+      ))}
+    </span>
+  )
+}
+
+function BoxLink({ box }: { box: string }) {
+  return (
+    <a href={`#/box/${box}`} className="font-mono font-semibold text-sky-900 underline decoration-sky-900/30 underline-offset-2 hover:decoration-sky-900">
+      {box}
+    </a>
+  )
+}
+
+function SolverChip({ gate }: { gate: Gate }) {
+  const fallback = gate.solver !== 'linear_sum_assignment'
+  return (
+    <span
+      title={gate.error ?? undefined}
+      className={`rounded-md px-3 py-1 text-base font-semibold ${fallback ? 'bg-amber-100 text-amber-950' : 'bg-emerald-100 text-emerald-900'}`}
+    >
+      {fallback ? 'Fallback greedy urgency sort' : 'Solver scipy linear_sum_assignment'}. Solved in {gate.solve_ms.toFixed(2)} ms
+    </span>
+  )
+}
+
+function Compare({ gate }: { gate: Gate }) {
+  const { rung, blunt, appointments, reefers_total, lfd_total } = gate.compare
+  const cards: [string, string, string][] = [
+    ['Appointments kept', `${rung.kept} of ${appointments}`, `0 of ${appointments}`],
+    ['Reefers kept', `${rung.reefers_kept} of ${reefers_total}`, `${blunt.reefers_kept} of ${reefers_total}`],
+    ['Last free day boxes kept', `${rung.lfd_kept} of ${lfd_total}`, `${blunt.lfd_kept} of ${lfd_total}`],
+    ['Throughput', `${rung.throughput_pct}%`, `${blunt.throughput_pct}%`],
+    ['Released so far', String(rung.released), String(blunt.released)],
+    ['Reefers past the loss limit', String(rung.reefers_lost), String(blunt.reefers_lost)],
+  ]
+  return (
+    <section className="rounded-lg border border-slate-300 bg-white px-4 py-3" aria-label="Rung against closing the terminal">
+      <div className="flex flex-wrap items-baseline gap-x-3">
+        <h3 className="text-lg font-bold">Rung against closing the terminal</h3>
+        <p className="text-base text-slate-600">The blunt move shuts the gate. Nothing leaves, so no booking is kept.</p>
+      </div>
+      <dl className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+        {cards.map(([label, a, b]) => (
+          <div key={label} className="rounded-md border border-slate-200 px-3 py-2">
+            <dt className="text-base text-slate-700">{label}</dt>
+            <dd className="flex flex-wrap items-baseline gap-x-2">
+              <span className="text-base font-semibold text-emerald-800">Rung</span>
+              <span className="text-lg font-bold tabular-nums">{a}</span>
+            </dd>
+            <dd className="flex flex-wrap items-baseline gap-x-2 text-base">
+              <span className="font-semibold text-red-800">Closed</span>
+              <span className="tabular-nums">{b}</span>
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  )
+}
+
+function Grid({ gate }: { gate: Gate }) {
+  const toggle = useLaneToggle()
+  const cells = useMemo(() => {
+    const map = new Map<string, (GateChip & { moved: boolean })[]>()
+    for (const chip of Object.values(gate.placed)) {
+      const key = `${chip.lane} ${chip.window}`
+      const list = map.get(key) ?? []
+      list.push(chip)
+      map.set(key, list)
+    }
+    for (const list of map.values()) list.sort((a, b) => b.urgency - a.urgency || a.box.localeCompare(b.box))
+    return map
+  }, [gate.placed])
+  const leftClosed = useMemo(() => {
+    const map = new Map<string, number>()
+    const closed = new Set(gate.lanes.filter((l) => !l.open).map((l) => l.id))
+    const away = [...gate.moved.map((m) => ({ lane: m.old_lane, window: m.old_window })), ...gate.overflow]
+    for (const b of away) {
+      if (!closed.has(b.lane)) continue
+      const key = `${b.lane} ${b.window}`
+      map.set(key, (map.get(key) ?? 0) + 1)
+    }
+    return map
+  }, [gate.lanes, gate.moved, gate.overflow])
+
+  return (
+    <section aria-label="Lanes by window" className="overflow-x-auto rounded-lg border border-slate-300 bg-white">
+      <table className="w-full min-w-[1100px] table-fixed border-collapse text-base">
+        <colgroup>
+          <col className="w-[112px]" />
+          {gate.windows.map((w) => (
+            <col key={w} />
+          ))}
+        </colgroup>
+        <thead className="bg-slate-800 text-white">
+          <tr>
+            <th className="px-2 py-2 text-left font-semibold">Lane</th>
+            {gate.windows.map((w) => (
+              <th key={w} className="px-2 py-2 text-left font-semibold tabular-nums">
+                {w}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {gate.lanes.map((lane) => (
+            <tr key={lane.id} className={`border-t border-slate-200 align-top ${lane.open ? '' : 'bg-slate-100'}`}>
+              <th scope="row" className="px-2 py-2 text-left">
+                <div className="text-lg font-bold">Lane {lane.id}</div>
+                <div className={`font-semibold ${lane.open ? 'text-emerald-800' : 'text-red-800'}`}>{lane.open ? 'Open' : 'Closed'}</div>
+                <button
+                  type="button"
+                  disabled={toggle.isPending}
+                  onClick={() => toggle.mutate({ lane: lane.id, open: !lane.open })}
+                  aria-label={`${lane.open ? 'Close' : 'Open'} lane ${lane.id}`}
+                  className="mt-1 rounded-md border border-slate-400 px-2 py-0.5 font-semibold hover:bg-slate-100 disabled:opacity-50"
+                >
+                  {lane.open ? 'Close' : 'Open'}
+                </button>
+              </th>
+              {gate.windows.map((w) => {
+                const key = `${lane.id} ${w}`
+                const chips = cells.get(key) ?? []
+                const away = leftClosed.get(key) ?? 0
+                return (
+                  <td key={w} className="border-l border-slate-200 px-1 py-1.5">
+                    {lane.open ? (
+                      <ul className="flex flex-col gap-1">
+                        {chips.map((c) => (
+                          <li
+                            key={c.box}
+                            className={`flex flex-wrap items-center gap-x-1 rounded border px-1 py-0.5 ${
+                              c.moved ? 'border-violet-400 bg-violet-50' : 'border-slate-300 bg-white'
+                            }`}
+                            title={`${c.box}. Urgency ${c.urgency}. ${c.step}.`}
+                          >
+                            <a href={`#/box/${c.box}`} className="font-mono text-base tracking-tight hover:underline">
+                              {c.box}
+                            </a>
+                            <Tags chip={c} />
+                          </li>
+                        ))}
+                        {chips.length < gate.capacity && (
+                          <li className="px-1.5 text-slate-500">{gate.capacity - chips.length} free</li>
+                        )}
+                      </ul>
+                    ) : (
+                      <span className="text-slate-600">{away > 0 ? `${away} moved out` : 'Closed'}</span>
+                    )}
+                  </td>
+                )
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  )
+}
+
+function ListSection({ title, count, children, empty }: { title: string; count: number; children: ReactNode; empty: string }) {
+  return (
+    <section className="rounded-lg border border-slate-300 bg-white" aria-label={title}>
+      <h3 className="border-b border-slate-200 px-4 py-2 text-lg font-bold">
+        {title} <span className="font-semibold text-slate-600">{count}</span>
+      </h3>
+      {count === 0 ? <p className="px-4 py-3 text-slate-700">{empty}</p> : <div className="max-h-[420px] overflow-y-auto">{children}</div>}
+    </section>
+  )
+}
+
+function Moved({ gate }: { gate: Gate }) {
+  return (
+    <ListSection title="Moved" count={gate.moved.length} empty="Nobody moved. Every booking keeps its lane and window.">
+      <ul className="divide-y divide-slate-100">
+        {gate.moved.map((m) => (
+          <li key={m.box} className="px-4 py-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <BoxLink box={m.box} />
+              <Tags chip={m} />
+              <span className="tabular-nums text-slate-700">Urgency {m.urgency}</span>
+              <span className="ml-auto font-semibold tabular-nums">{m.delay_hours > 0 ? `${sayHours(m.delay_hours)} later` : 'Same window'}</span>
+            </div>
+            <p className="text-slate-800">{m.reason}</p>
+          </li>
+        ))}
+      </ul>
+    </ListSection>
+  )
+}
+
+function Overflow({ gate }: { gate: Gate }) {
+  return (
+    <ListSection title="Overflow" count={gate.overflow.length} empty="No overflow. Every box not on HOLD has a slot tonight.">
+      <ul className="divide-y divide-slate-100">
+        {gate.overflow.map((o) => (
+          <li key={o.box} className="px-4 py-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <BoxLink box={o.box} />
+              <Tags chip={o} />
+              <StepChip step={o.step} />
+              <span className="ml-auto tabular-nums text-slate-700">Urgency {o.urgency}</span>
+            </div>
+            <p className="text-slate-800">
+              Booked {o.window} lane {o.lane}. {o.reason}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </ListSection>
+  )
+}
+
+function Held({ gate }: { gate: Gate }) {
+  if (gate.held.length === 0 && gate.missed.length === 0) return null
+  return (
+    <section className="rounded-lg border border-slate-300 bg-white px-4 py-3 text-base" aria-label="Not planned">
+      {gate.held.length > 0 && (
+        <details>
+          <summary className="cursor-pointer font-semibold">
+            {gate.held.length} boxes on HOLD take no slot until their hold clears
+          </summary>
+          <ul className="mt-2 divide-y divide-slate-100">
+            {gate.held.map((h) => (
+              <li key={h.box} className="flex flex-wrap items-center gap-2 py-1">
+                <BoxLink box={h.box} />
+                <Tags chip={h} />
+                <span className="text-slate-800">{h.reason}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+      {gate.missed.length > 0 && (
+        <details className="mt-2">
+          <summary className="cursor-pointer font-semibold">
+            {gate.missed.length} boxes missed a window that has ended ({gate.ended_windows.join(', ')})
+          </summary>
+          <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+            {gate.missed.map((b) => (
+              <BoxLink key={b} box={b} />
+            ))}
+          </p>
+        </details>
+      )}
+    </section>
+  )
+}
+
+export default function GateScreen() {
+  const gate = useGate()
+  const toggle = useLaneToggle()
+  const g = gate.data
+  const closed = g ? g.lanes.filter((l) => !l.open).map((l) => l.id) : []
+
+  return (
+    <main className="px-4 pb-10 pt-4">
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        <h2 className="mr-2 text-xl font-bold">Gate plan</h2>
+        {g && <SolverChip gate={g} />}
+        {g && (
+          <span className="text-base text-slate-700">
+            {Object.keys(g.placed).length} placed in {g.units} slots. {g.capacity} trucks per lane per hour.{' '}
+            {closed.length > 0 ? `Lanes closed ${laneList(closed)}.` : 'All lanes open.'}
+          </span>
+        )}
+        <span className="flex flex-wrap items-center gap-2 text-base text-slate-700 sm:ml-auto">
+          {TAGS.map((t) => (
+            <span key={t.key} className="flex items-center gap-1">
+              <span className={`rounded px-1 font-bold leading-6 ${t.className}`}>{t.letter}</span>
+              {t.label}
+            </span>
+          ))}
+        </span>
+      </div>
+
+      {gate.isError && !g && <Notice tone="error">Cannot reach the gate plan. Retrying every 2 seconds.</Notice>}
+      {gate.isPending && <Notice>Solving the gate plan</Notice>}
+      {toggle.error && <Notice tone="error">{toggle.error.message}</Notice>}
+      {g?.error && <Notice tone="error">The solver failed, so Rung used the greedy urgency sort. {g.error}</Notice>}
+      {g && g.windows.length === 0 && <Notice>Every window tonight has ended. Nothing left to plan.</Notice>}
+
+      {g && g.windows.length > 0 && (
+        <div className="flex flex-col gap-3">
+          <Compare gate={g} />
+          <Grid gate={g} />
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            <Moved gate={g} />
+            <Overflow gate={g} />
+          </div>
+          <Held gate={g} />
+        </div>
+      )}
+    </main>
+  )
+}

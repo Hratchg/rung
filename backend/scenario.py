@@ -20,6 +20,7 @@ from . import config
 from .audit import Audit, decision_line
 from .engine import evaluate
 from .feeds import ReeferModel, loss_limit_c, reefer_model, weighbridge_reading
+from .gate import Appt, Assignment, solve
 from .models import CUSTOMS_HOLD_NAMES, STEPS, Box, Decision
 from .t49 import map_container
 from .timefmt import format_offset, hours_between, iso, lfd_deadline, parse_date, parse_dt, parse_offset, window_at
@@ -315,6 +316,7 @@ class Scenario:
             self.next_event = 0
             self.event_log: list[dict] = []
             self.twists: list[dict] = []
+            self.gate_cache: tuple[tuple, list[Appt], Assignment] | None = None
             self.boxes: dict[str, BoxState] = {}
             for c in list(cfg.get("containers", [])) + generate_synthetic(cfg):
                 state = self._box_state(c)
@@ -495,7 +497,26 @@ class Scenario:
                 state.weight_asked = True
                 return "Weight ask sent. Reweigh requested."
             return "Ask recorded."
+        if step == "SLOW":
+            return self._rebook(state)
         return f"{step} recorded."
+
+    def _rebook(self, state: BoxState) -> str:
+        """Approving SLOW books the box into the slot the optimizer planned for it."""
+        appt = state.appointment
+        if not appt:
+            return "SLOW recorded. The box has no appointment."
+        _, plan = self.gate_plan()
+        slot = plan.placed.get(state.number)
+        if slot is None:
+            return "SLOW recorded. No open slot tonight, the box stays in overflow."
+        if slot == (appt["lane"], appt["window"]):
+            return "SLOW recorded. The box keeps its slot."
+        old_lane, old_window = appt["lane"], appt["window"]
+        appt["lane"], appt["window"] = slot
+        appt["at"] = iso(window_at(slot[1], self.start))
+        self.gate_cache = None
+        return f"Moved from {old_window} lane {old_lane} to {slot[1]} lane {slot[0]}."
 
     def _repoll(self, state: BoxState) -> str:
         if "terminal" in self.dark_sources:
@@ -515,27 +536,93 @@ class Scenario:
         near = lfd is not None and hours_between(lfd_deadline(lfd, self.tz), self.now) <= 24
         return float(daily_demurrage(state.equipment_type)) if (accruing or near) else 0.0
 
+    def open_windows(self) -> list[str]:
+        """Windows whose hour has not ended. Ended windows take no more trucks."""
+        return [w for w in self.windows if window_at(w, self.start) + timedelta(hours=1) > self.now]
+
+    def lfd_today(self, state: BoxState) -> bool:
+        lfd = parse_date((state.terminal or {}).get("pickup_lfd"))
+        return lfd is not None and lfd <= self.now.date()
+
+    def gate_rows(self) -> list[Appt]:
+        windows = set(self.open_windows())
+        rows = []
+        for s in self.boxes.values():
+            if s.released_at or not s.appointment or not s.decision or s.appointment["window"] not in windows:
+                continue
+            eff = self.effective(s)
+            rows.append(
+                Appt(
+                    box=s.number,
+                    lane=int(s.appointment["lane"]),
+                    window=s.appointment["window"],
+                    urgency=eff["urgency"],
+                    step=eff["step"],
+                    reefer=s.equipment_type == "reefer",
+                    lfd_today=self.lfd_today(s),
+                )
+            )
+        return rows
+
+    def missed(self) -> list[str]:
+        windows = set(self.open_windows())
+        return sorted(
+            s.number for s in self.boxes.values() if s.appointment and not s.released_at and s.appointment["window"] not in windows
+        )
+
+    def gate_plan(self) -> tuple[list[Appt], Assignment]:
+        rows = self.gate_rows()
+        windows = self.open_windows()
+        lanes = self.lanes_open()
+        sig = (tuple(lanes), tuple(windows), tuple(sorted(rows, key=lambda a: a.box)))
+        if self.gate_cache and self.gate_cache[0] == sig:
+            return self.gate_cache[1], self.gate_cache[2]
+        plan = solve(rows, lanes, windows, self.capacity)
+        self.gate_cache = (sig, rows, plan)
+        return rows, plan
+
+    def set_lane(self, lane: int, open_: bool) -> dict:
+        if not 1 <= lane <= self.lane_count:
+            raise ValueError(f"Lane {lane} does not exist. Pier 7 has lanes 1 to {self.lane_count}.")
+        return self.post_event({"type": "lanes_up" if open_ else "lanes_down", "lanes": [lane]})
+
+    def _past_limit(self, reading: dict) -> bool:
+        return reading["product_temp_c"] >= loss_limit_c(reading["set_point_c"])
+
     def counters(self) -> dict:
         released = [s for s in self.boxes.values() if s.released_at]
         powered = lost = 0
         for s in self.boxes.values():
-            if not s.reefer_model or s.released_at:
+            if not s.reefer_model:
+                continue
+            if s.released_at:
+                # A released reefer rides out on the truck genset, so it counts as powered from then on.
+                powered += 1
+                lost += self._past_limit(s.reefer_reading(s.released_at))
                 continue
             reading = s.reefer_reading(self.now)
-            if reading["power_on"]:
-                powered += 1
-            if reading["product_temp_c"] >= loss_limit_c(reading["set_point_c"]):
-                lost += 1
-        due = [s for s in self.boxes.values() if s.appointment and parse_dt(s.appointment["at"]) <= self.now]
-        released_due = [s for s in due if s.released_at]
+            powered += bool(reading["power_on"])
+            lost += self._past_limit(reading)
+        rows, plan = self.gate_plan()
+        kept = [a for a in rows if a.box in plan.placed and a.step != "HOLD"]
         return {
             "released": len(released),
             "released_blunt": 0,
             "reefers_powered": powered,
             "reefers_lost": lost,
             "demurrage_avoided_usd": round(sum(s.demurrage_avoided for s in released)),
-            "throughput_pct": round(100 * len(released_due) / len(due)) if due else 0,
+            "throughput_pct": round(100 * len(kept) / len(rows)) if rows else 0,
         }
+
+    def counters_blunt(self) -> dict:
+        """The blunt move: close the terminal. Nothing gates out, so every reefer stays in the yard."""
+        powered = lost = 0
+        for s in self.boxes.values():
+            if s.reefer_model:
+                reading = s.reefer_reading(self.now)
+                powered += bool(reading["power_on"])
+                lost += self._past_limit(reading)
+        return {"released": 0, "reefers_powered": powered, "reefers_lost": lost, "demurrage_avoided_usd": 0, "throughput_pct": 0}
 
     def apply_live(self, payload: dict, live: bool) -> int:
         with self.lock:

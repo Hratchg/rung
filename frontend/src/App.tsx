@@ -2,16 +2,18 @@ import { useCallback, useEffect, useState } from 'react'
 import { useAppState, useScenarioControls, type ScenarioEvent, type State } from './api'
 import { AuditPanel, TwistPanel } from './Audit'
 import BoxCard from './BoxCard'
+import GateScreen from './Gate'
 import Queue from './Queue'
 import { laneList } from './format'
 import { BadgeChip } from './ui'
 
-type Route = { name: 'queue' } | { name: 'box'; number: string }
+type Route = { name: 'queue' } | { name: 'gate' } | { name: 'box'; number: string }
 type Panel = { kind: 'audit'; box: string } | { kind: 'twist' } | null
 
 function parseHash(hash: string): Route {
   const box = hash.match(/^#\/box\/([A-Za-z0-9]+)/)
   if (box) return { name: 'box', number: box[1].toUpperCase() }
+  if (/^#\/gate\b/.test(hash)) return { name: 'gate' }
   return { name: 'queue' }
 }
 
@@ -171,6 +173,9 @@ function Nav({ route, panel, onPanel }: { route: Route; panel: Panel; onPanel: (
       <a href="#/" className={tab(route.name === 'queue')} aria-current={route.name === 'queue' ? 'page' : undefined}>
         Queue
       </a>
+      <a href="#/gate" className={tab(route.name === 'gate')} aria-current={route.name === 'gate' ? 'page' : undefined}>
+        Gate
+      </a>
       <button type="button" className={tab(panel?.kind === 'audit')} onClick={() => onPanel(panel?.kind === 'audit' ? null : { kind: 'audit', box: auditBox })}>
         Audit log
       </button>
@@ -245,11 +250,9 @@ export default function App() {
       {state.isError && (
         <p className="bg-red-100 px-4 py-2 text-red-900">Lost contact with the Rung server. Showing the last update.</p>
       )}
-      {route.name === 'box' ? (
-        <BoxCard key={route.number} number={route.number} onAudit={(box) => setPanel({ kind: 'audit', box })} />
-      ) : (
-        <Queue carriers={state.data.carriers} />
-      )}
+      {route.name === 'box' && <BoxCard key={route.number} number={route.number} onAudit={(box) => setPanel({ kind: 'audit', box })} />}
+      {route.name === 'gate' && <GateScreen />}
+      {route.name === 'queue' && <Queue carriers={state.data.carriers} />}
       {panel?.kind === 'audit' && <AuditPanel key={panel.box} initialBox={panel.box} onClose={closePanel} />}
       {panel?.kind === 'twist' && <TwistPanel onClose={closePanel} />}
     </div>

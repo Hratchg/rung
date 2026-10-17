@@ -196,5 +196,10 @@ class JumpIn(BaseModel):
     t: str = Field(pattern=r"^\+\d{2}:\d{2}$")
 
 
+class LaneIn(BaseModel):
+    lane: int
+    open: bool
+
+
 class SpeedIn(BaseModel):
     minutes_per_second: float = Field(ge=0, le=120)

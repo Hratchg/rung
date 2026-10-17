@@ -26,3 +26,12 @@ One entry per phase. Each entry says what the assistant produced and what a huma
 - It built `BoxCard.tsx` with five source panels, trust bars with the trust reason on hover, conflicts with both values, fired rules, the reason, and history, plus `Audit.tsx` with the audit and twist panels.
 - It added 8 tests. The suite has 44 tests.
 - Human check: the warm up clock wording and the loss limits, 8 C over the set point for frozen cargo and 4 C over for the rest.
+
+## Entry 4. Phase 3, Slow Lane
+
+- Asked the assistant to build the gate re-slotting optimizer, the gate API, and the Gate screen, with counters measured against closing the terminal.
+- It wrote `backend/gate.py`: slot units per open lane, window, and truck, the spec cost matrix with a flat finite penalty, `linear_sum_assignment` solved first for reefers and last free day boxes and then for the rest, a greedy fallback, and a moved diff with one line reasons.
+- It added `GET /api/gate`, `POST /api/gate/lanes`, blunt move counters, planned slots on the appointment clock, and SLOW approval that rebooks the box.
+- It built `Gate.tsx` with the lanes by windows grid, lane toggles, moved and overflow lists, the solver chip, and the comparison against a closed terminal.
+- It wrote 14 gate tests. The suite has 58 tests.
+- Human check: the spec cost weight (101 minus urgency) makes delay cheaper for urgent boxes. The priority tier keeps reefers and last free day boxes whole, but inside a tier urgent boxes are the ones pushed later.

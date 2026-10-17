@@ -41,6 +41,7 @@ export type State = {
   lanes_open: number[]
   dark_sources: string[]
   counters: Counters
+  counters_blunt: Omit<Counters, 'released_blunt'>
   legend: { live: string; simulated: string }
   poller: Poller
   carriers: string[]
@@ -59,7 +60,15 @@ export type Planner = {
 export type Clocks = {
   lfd: { date: string; hours: number; label: string } | null
   reefer: { power_on: boolean; product_temp_c: number; set_point_c: number; label: string } | null
-  appointment: { lane: number; window: string; at: string; hours: number; lane_closed: boolean; label: string } | null
+  appointment: {
+    lane: number
+    window: string
+    at: string
+    hours: number
+    lane_closed: boolean
+    planned: { lane: number | null; window: string | null; label: string } | null
+    label: string
+  } | null
 }
 
 export type QueueRow = {
@@ -188,6 +197,55 @@ export type Twist = {
 
 export type AuditPayload = { lines: AuditLine[]; total: number; twists: Twist[] }
 
+export type GateChip = {
+  box: string
+  urgency: number
+  step: Step
+  reefer: boolean
+  lfd_today: boolean
+  lane: number
+  window: string
+}
+
+export type GateMove = {
+  box: string
+  old_lane: number
+  old_window: string
+  new_lane: number
+  new_window: string
+  delay_hours: number
+  reason: string
+  urgency: number
+  reefer: boolean
+  lfd_today: boolean
+}
+
+type CompareSide = Omit<Counters, 'released_blunt'> & { kept: number; reefers_kept: number; lfd_kept: number }
+
+export type Gate = {
+  lanes: { id: number; open: boolean }[]
+  windows: string[]
+  ended_windows: string[]
+  capacity: number
+  units: number
+  placed: Record<string, GateChip & { moved: boolean }>
+  moved: GateMove[]
+  overflow: (GateChip & { reason: string })[]
+  held: (GateChip & { reason: string })[]
+  missed: string[]
+  solve_ms: number
+  solver: string
+  error: string | null
+  compare: {
+    appointments: number
+    non_hold: number
+    reefers_total: number
+    lfd_total: number
+    rung: CompareSide
+    blunt: CompareSide
+  }
+}
+
 export type DecisionBody = {
   box: string
   action: 'approve' | 'override'
@@ -250,6 +308,10 @@ export function useAudit(filters: { box: string; limit: number }) {
   })
 }
 
+export function useGate() {
+  return useQuery({ queryKey: ['gate'], queryFn: () => request<Gate>('/api/gate'), placeholderData: (previous) => previous })
+}
+
 function useRefreshAll() {
   const qc = useQueryClient()
   return () => qc.invalidateQueries()
@@ -258,6 +320,17 @@ function useRefreshAll() {
 export function useDecision() {
   const refresh = useRefreshAll()
   return useMutation({ mutationFn: (body: DecisionBody) => post('/api/decision', body), onSuccess: refresh })
+}
+
+export function useLaneToggle() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: { lane: number; open: boolean }) => post<Gate>('/api/gate/lanes', body),
+    onSuccess: (gate) => {
+      qc.setQueryData(['gate'], gate)
+      qc.invalidateQueries()
+    },
+  })
 }
 
 export function useScenarioControls() {

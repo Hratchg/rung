@@ -6,8 +6,8 @@ conflicts between sources, and recommends the gentlest step on a ladder:
 RELEASE, WATCH, ASK, SLOW, HOLD, and HAND. The planner approves or overrides every hold or release,
 and every decision is written to an audit log.
 
-Status: Phase 2 (Rung) is built: the queue, the box card, and the audit and twist panels. The gate
-optimizer and voice calls come in later phases.
+Status: Phase 3 (Slow Lane) is built: the queue, the box card, the audit and twist panels, and the
+gate re-slotting optimizer with its Gate screen. Voice calls come in Phase 4.
 
 ## Screens
 
@@ -66,7 +66,8 @@ curl -X POST localhost:8000/api/scenario/event -H 'Content-Type: application/jso
 | `backend/t49.py` | Terminal49 poller with fixture fallback |
 | `backend/audit.py` | `audit.jsonl` writer and a 5000 line ring buffer |
 | `backend/main.py` | FastAPI routes, serves `frontend/dist` from the same origin |
-| `frontend/src/` | Vite, React, TypeScript, Tailwind, TanStack Query. Header and Queue screen |
+| `twists.json` | Twist log. One entry per merged TWIST: tag, text, received and merged times, files added |
+| `frontend/src/` | Vite, React, TypeScript, Tailwind, TanStack Query. `App.tsx` header and hash routes, `Queue.tsx`, `BoxCard.tsx`, `Audit.tsx` panels, `Decide.tsx` approve and override |
 | `tests/` | Engine and API tests. `test_gate.py` is a placeholder until Phase 3 |
 
 ## Live versus simulated
