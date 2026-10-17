@@ -119,3 +119,4 @@ The Retell agent "Pier 7 gate desk" needs a post call analysis with the fields `
 | customs | customs, USDA, VACIS holds | Simulated. Live from Terminal49 when a key with read access is set |
 | weighbridge | measured weight | Simulated only |
 | reefer | set point, air and product temperature, power | Simulated only |
+| ask call | transcript, outcome, callback needed, notes | Simulated. Live through Retell when `RETELL_API_KEY` and `RETELL_AGENT_ID` are set |
