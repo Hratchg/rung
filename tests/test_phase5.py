@@ -82,6 +82,50 @@ def test_banner_shows_when_the_poller_fails_and_not_without_a_key(client, monkey
     assert no_key.failing_since is None and client.get("/api/state").json()["dark_feed"] == []
 
 
+NO_READ_401 = {
+    "errors": [
+        {
+            "detail": "You do not have permissions for using the API, except for creating tracking requests. "
+            "All other permissions require a paid plan. See https://app.terminal49.com/settings/billing"
+        }
+    ]
+}
+
+
+def poll_with(poller, response):
+    async def go():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(lambda request: response)) as c:
+            await poller.poll_once(c)
+
+    asyncio.run(go())
+
+
+def test_a_key_without_read_access_is_fixture_mode_not_a_dark_feed(client, monkeypatch, tmp_path):
+    fixture = tmp_path / "t49.json"
+    fixture.write_text('{"data": []}')
+    seen = []
+    tracking_only = Poller(lambda payload, live: seen.append(live) or 0, key="k", fixture=fixture)
+    for _ in range(2):
+        poll_with(tracking_only, httpx.Response(401, json=NO_READ_401))
+    assert tracking_only.status == "no_read" and seen == [False, False]
+    assert not tracking_only.failing and tracking_only.failing_since is None
+    monkeypatch.setattr(main, "poller", tracking_only)
+    state = client.get("/api/state").json()
+    assert state["dark_feed"] == []
+    assert state["poller"]["status"] == "no_read" and "every box simulated" in state["poller"]["message"]
+    assert state["poller"]["live_count"] == 0
+    assert not any(r["live"] for r in client.get("/api/queue").json())
+
+    client.post("/api/scenario/event", json={"type": "source_dark", "source": "terminal"})
+    assert [b["cause"] for b in client.get("/api/state").json()["dark_feed"]] == ["scenario"]
+
+    rejected = Poller(lambda payload, live: 0, key="k", fixture=fixture)
+    poll_with(rejected, httpx.Response(401, json={"errors": [{"detail": "invalid API token"}]}))
+    assert rejected.status == "unauthorized" and rejected.failing_since
+    monkeypatch.setattr(main, "poller", rejected)
+    assert "poller" in [b["cause"] for b in client.get("/api/state").json()["dark_feed"]]
+
+
 # Spoof input.
 
 

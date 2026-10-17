@@ -57,17 +57,18 @@ function Counter({ label, value, detail }: { label: string; value: string; detai
 const POLLER_SHORT: Record<string, string> = {
   starting: 'Terminal49 starting',
   no_key: 'No Terminal49 key. Fixture data',
+  no_read: 'Fixture mode. Terminal49 key has no read access',
   unauthorized: 'Terminal49 refused the key. Fixture data',
   error: 'Terminal49 unreachable. Fixture data',
 }
 
+const FIXTURE_MODE = ['no_key', 'no_read']
+
 function PollerChip({ poller }: { poller: State['poller'] }) {
   const ok = poller.status === 'ok'
+  const tone = ok ? 'bg-emerald-100 text-emerald-900' : FIXTURE_MODE.includes(poller.status) ? 'bg-slate-200 text-slate-900' : 'bg-amber-100 text-amber-950'
   return (
-    <span
-      title={poller.message}
-      className={`rounded-md px-2 py-1 text-base font-semibold ${ok ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-950'}`}
-    >
+    <span title={poller.message} className={`rounded-md px-2 py-1 text-base font-semibold ${tone}`}>
       {ok ? `Terminal49 live. ${poller.live_count} boxes` : POLLER_SHORT[poller.status] ?? poller.message}
     </span>
   )

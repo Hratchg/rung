@@ -42,11 +42,24 @@ TERMINAL_FIELDS = (
 STATUS_TEXT = {
     "starting": "Terminal49 poller starting.",
     "no_key": "No Terminal49 key. Running on fixture.",
-    "unauthorized": "Terminal49 key has no read access. Running on the fixture.",
+    "no_read": "Terminal49 key can create tracking requests but has no read access. Running on the fixture, every box simulated.",
+    "unauthorized": "Terminal49 rejected the key. Running on the fixture.",
     "error": "Terminal49 unreachable. Running on the fixture.",
     "ok": "Terminal49 live.",
 }
+# no_key and no_read are fixture mode, not failures, so they raise no dark feed banner.
 FAILING = ("unauthorized", "error")
+# Terminal49 answers every GET with a 401 carrying this text when the account has no API plan.
+NO_READ_MARKERS = ("except for creating tracking requests", "require a paid plan")
+
+
+def no_read_access(res: httpx.Response) -> bool:
+    try:
+        errors = res.json().get("errors") or []
+    except (ValueError, AttributeError):
+        return False
+    detail = " ".join(str(e.get("detail", "")) for e in errors if isinstance(e, dict))
+    return any(marker in detail for marker in NO_READ_MARKERS)
 
 
 def headers(key: str) -> dict:
@@ -128,10 +141,14 @@ class Poller:
         try:
             res = await client.get(f"{BASE_URL}/containers", headers=headers(self.key))
             if res.status_code == 401:
+                status = "no_read" if no_read_access(res) else "unauthorized"
                 if not self._warned_401:
-                    log.warning("Terminal49 returned 401. The key has no read entitlement. Running on the fixture.")
+                    if status == "no_read":
+                        log.warning("Terminal49 returned 401. The key has no read entitlement. Running on the fixture.")
+                    else:
+                        log.warning("Terminal49 returned 401 and rejected the key. Running on the fixture.")
                     self._warned_401 = True
-                self._fallback("unauthorized")
+                self._fallback(status)
                 return
             res.raise_for_status()
             payload = res.json()
