@@ -1,32 +1,42 @@
 SHELL := /bin/bash
+PYTHON ?= python3.12
 PY := .venv/bin/python
+HOST ?= 127.0.0.1
 PORT ?= 8000
 
 .PHONY: setup dev build demo test tunnel retell-setup
 
-setup:
-	python3.12 -m venv .venv
-	.venv/bin/pip install -r requirements.txt
-	cd frontend && npm install
-	[ -f .env ] || cp .env.example .env
+.venv/.ready: requirements.txt
+	$(PYTHON) -m venv .venv
+	.venv/bin/pip install -q -r requirements.txt
+	touch $@
 
-dev:
+frontend/node_modules/.ready: frontend/package.json frontend/package-lock.json
+	cd frontend && npm ci --no-audit --no-fund
+	touch $@
+
+.env:
+	cp .env.example .env
+
+setup: .venv/.ready frontend/node_modules/.ready .env
+
+dev: setup
 	trap 'kill 0' EXIT; \
-	$(PY) -m uvicorn backend.main:app --reload --port $(PORT) & \
+	$(PY) -m uvicorn backend.main:app --reload --host $(HOST) --port $(PORT) & \
 	(cd frontend && npm run dev) & \
 	wait
 
-build:
+build: frontend/node_modules/.ready
 	cd frontend && npm run build
 
-demo: build
-	$(PY) -m uvicorn backend.main:app --port $(PORT)
+demo: setup build
+	$(PY) -m uvicorn backend.main:app --host $(HOST) --port $(PORT)
 
-test:
+test: .venv/.ready
 	$(PY) -m pytest -q; code=$$?; if [ $$code -eq 5 ]; then echo "No tests collected"; exit 0; fi; exit $$code
 
-tunnel:
+tunnel: .venv/.ready
 	$(PY) scripts/tunnel.py $(PORT)
 
-retell-setup:
+retell-setup: .venv/.ready
 	$(PY) scripts/retell_setup.py $(ARGS)
