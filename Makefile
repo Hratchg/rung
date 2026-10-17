@@ -2,7 +2,7 @@ SHELL := /bin/bash
 PY := .venv/bin/python
 PORT ?= 8000
 
-.PHONY: setup dev build demo test tunnel
+.PHONY: setup dev build demo test tunnel retell-setup
 
 setup:
 	python3.12 -m venv .venv
@@ -26,4 +26,7 @@ test:
 	$(PY) -m pytest -q; code=$$?; if [ $$code -eq 5 ]; then echo "No tests collected"; exit 0; fi; exit $$code
 
 tunnel:
-	cloudflared tunnel --url http://localhost:$(PORT) 2>&1 | tee /dev/stderr | grep --line-buffered -o 'https://[a-z0-9-]*\.trycloudflare\.com' | sed 's/^/PUBLIC_BASE_URL=/'
+	$(PY) scripts/tunnel.py $(PORT)
+
+retell-setup:
+	$(PY) scripts/retell_setup.py $(ARGS)
