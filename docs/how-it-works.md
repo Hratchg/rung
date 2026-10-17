@@ -26,7 +26,8 @@ Every field in the UI carries a badge, live or simulated, so the screen never hi
 ## Reading the screen
 
 The UI is built to be read from across a room at 1280 by 720. Every status color comes with a text
-label, and rule and conflict ids such as R3 or C1 stay as secondary detail behind plain words.
+label, and rule and conflict ids such as R3 or C1 stay as secondary detail behind plain words. The
+[UI guide](ui-guide.md) walks through every screen with annotated screenshots and explains every term.
 
 - **Header**, in three rows. The first says where you are: Rung, Gate triage at Pier 7, the night (Tuesday or Harbor Night), the scenario clock, lanes open, and the three screens, **Queue**, **Gate plan**, and **Audit log**. The second row is **Tonight so far**: Released, Reefers powered, Reefers lost, Fees avoided, Bookings kept, and Truck idle in hours and kg CO2, marked modelled. The third shows the latest scenario event on the left and where the data comes from on the right. A red banner sits above it while a feed is dark.
 - **Queue**. The headline counts the boxes that need a decision. Under it the ladder strip shows the six steps gentlest first, each with its count and a short meaning, and Hand set apart on the right. Click a step to filter. **How the ladder works** explains every step and how the votes are counted. Each row leads with plain words such as Weight mismatch or Hold by customs broker, and has one main button named for the action.
