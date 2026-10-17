@@ -60,3 +60,13 @@ One entry per phase. Each entry says what the assistant produced and what a huma
 - It wrote `backend/gitdiff.py` for `twist:` commits and twist git tags, and the diff view in the twist panel.
 - It wrote 16 Phase 5 tests. The suite has 87 tests.
 - Human check: the circuit layout (5 yard rows per circuit), the 3 unit trip threshold, the 2 to 8 kW normal draw band, and the 02:00 last window for the 03:00 rated deadline are all assumptions. Confirm them with the terminal.
+
+## Entry 7. Live paths
+
+- Asked the assistant to turn on the live Retell and Terminal49 paths so the user only pastes keys.
+- It wrote `scripts/retell_setup.py` (`make retell-setup`), which creates or updates the Retell LLM and the "Pier 7 gate desk" agent with the prompt, the `lookup_box` and `record_outcome` custom functions, `end_call`, and the post call analysis fields, then writes the ids to `.env`.
+- It wrote `scripts/tunnel.py` (`make tunnel`), which opens a cloudflared quick tunnel, writes `PUBLIC_BASE_URL` to `.env`, checks it from the internet, and re-points the Retell functions when the URL changes.
+- A real web call from the Ask button failed at first: Retell now hands out gateway transport tokens, and the browser was joining over LiveKit. The call start now passes the transport and ICE servers through.
+- The Terminal49 key can only create tracking requests. That 401 is now fixture mode with a calm header chip, not a dark feed banner.
+- It wrote 8 tests for the setup script, the `.env` writer, the transport pass through, and fixture mode. The suite has 95 tests.
+- Human check: two real web calls ran with a recorded trucker voice. Both hit `record_outcome` through the tunnel, landed `confirmed_loaded`, and wrote audit lines with the Retell call id. The transcript reaches the card only when the call ends.

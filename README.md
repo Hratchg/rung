@@ -31,8 +31,8 @@ make setup        # creates .venv, installs requirements.txt and frontend packag
 ```
 
 Every value in `.env` may stay empty. The scenario runs with no network at all. With no
-`T49_API_KEY`, or a key that gets a 401, the Terminal49 poller runs on `fixtures/t49_snapshot.json`
-and every box is badged simulated.
+`T49_API_KEY`, or a key without read access, the Terminal49 poller runs on `fixtures/t49_snapshot.json`
+and every box is badged simulated. Keys live only in `.env`, which git ignores, and no script prints them.
 
 ## Run
 
@@ -42,8 +42,25 @@ and every box is badged simulated.
 | Demo, one process on one port | `make demo` builds the frontend, then runs `uvicorn backend.main:app --port 8000`. Open http://localhost:8000 |
 | Tests | `make test` |
 
-`make build` only builds the frontend. `make tunnel` starts a cloudflared quick tunnel and prints the
-`PUBLIC_BASE_URL` line to paste into `.env`. `scripts/track.py` creates Terminal49 tracking requests.
+`make build` only builds the frontend. `scripts/track.py` creates Terminal49 tracking requests.
+
+## Going live
+
+The only Retell value to paste is `RETELL_API_KEY`, the secret key with the webhook badge under API
+Keys in the Retell dashboard, so it can also verify the signatures on custom function calls. With the
+app running on port 8000:
+
+```bash
+make tunnel          # second terminal, keep it open. Opens a cloudflared quick tunnel and writes PUBLIC_BASE_URL to .env
+make retell-setup    # once. Creates the Retell LLM and the "Pier 7 gate desk" agent, writes RETELL_LLM_ID and RETELL_AGENT_ID to .env
+```
+
+Then restart the app. The Ask button on a box card now places a real Retell web call in the browser.
+
+- `make tunnel` needs `cloudflared` on the path. It checks that `PUBLIC_BASE_URL/api/state` answers from the internet. A quick tunnel gets a new URL on every start, so once `RETELL_LLM_ID` is in `.env` it also points the Retell custom functions at the new URL. The tunnel makes the whole app public, scenario controls included, for as long as it runs.
+- `make retell-setup` is safe to run again. It updates the LLM and agent whose ids are in `.env`, and `make retell-setup ARGS=--recreate` makes new ones. The agent gets the prompt for the outbound weight check and the inbound "is my box ready" call, the custom functions `lookup_box` and `record_outcome`, an `end_call` tool, and the post call analysis fields `outcome`, `callback_needed`, and `notes`. `RETELL_VOICE_ID` picks the voice. Without `PUBLIC_BASE_URL` the agent has no custom functions, and the outcome comes from the post call analysis alone.
+- Phone calls need a number bought in the Retell dashboard. Put it in `RETELL_FROM_NUMBER`, set `RETELL_PHONE_ENABLED=true`, and run `make retell-setup` again to bind the number to the agent for inbound and outbound calls. Inbound "is my box ready" calls only happen on a number.
+- Terminal49 reads need full API access, a paid plan or the 7 day API trial from Developers in the Terminal49 app. A key without it gets a 401 that says it can only create tracking requests. Rung treats that as fixture mode: the header chip reads "Fixture mode. Terminal49 key has no read access", every box stays simulated, and there is no dark feed banner. With read access, `GET /v2/containers` returns only the containers tracked in the account, so register real ones first with `scripts/track.py container <number> <SCAC>`. They show up as extra live rows in the queue. Terminal49 webhooks need the same paid access.
 
 ## Driving the scenario
 
@@ -73,7 +90,7 @@ curl 'localhost:8000/api/audit?limit=1&diff=true'
 
 | Feature | Where | How it works |
 | --- | --- | --- |
-| Dark feed banner | Header | A red banner reads "Terminal feed dark, N min" while a `source_dark` event is in force, counted in scenario minutes, or while the Terminal49 poller fails with a 401 or any other error, counted in real minutes. A missing key is not a failure, so it shows no banner. The queue keeps running from the last snapshot |
+| Dark feed banner | Header | A red banner reads "Terminal feed dark, N min" while a `source_dark` event is in force, counted in scenario minutes, or while the Terminal49 poller fails because the key is rejected or the API is unreachable, counted in real minutes. A missing key, or a key that can only create tracking requests, is fixture mode, not a failure, so it shows no banner. The queue keeps running from the last snapshot |
 | Spoof input | Box card | Type a fake carrier weight or place and clear a hold. The engine re-evaluates at once, the trust bars move, the card shows the step and trust before and after, and the audit log gets a `spoof` line |
 | Rated order mode | Header switch, Gate screen | `scenario.json` lists six rated boxes under `rated_orders` with a gate out deadline 5 h after the clock start (03:00). While on, they get plus 50 urgency and rule R13 votes RELEASE with a pin, so a stronger step such as ASK on a weight conflict still wins. On the gate they are solved first and cannot take a window that starts after 02:00. Boxes that lost their slot to them show as Slid at the top of Overflow, with the slot they would have had |
 | Silent reefer classifier | Header reefer picker, queue, box card | Each reefer reports its circuit (5 yard rows per circuit), its power draw, and any alarm. A unit is silent when its telemetry stops, or when its last reading is more than 2 h old. Rule R14 votes ASK, owner reefer crew, with one text per class. Tripped: 3 or more units on one circuit silent within 10 minutes. Failed: an alarm, or a draw outside 2 to 8 kW, before the silence. Telemetry: a single unit that drew a normal load |
@@ -106,12 +123,13 @@ Every call writes a `voice` audit line with the call id when it starts, and anot
 | Keys set in `.env` | What runs |
 | --- | --- |
 | None | Simulated web call. A scripted transcript plays line by line, and a picker on the card sets the trucker answer |
-| `RETELL_API_KEY`, `RETELL_AGENT_ID` | `create_web_call` with the six dynamic variables as strings and the box number in metadata. The browser joins with `retell-client-js-sdk` using the access token |
+| `RETELL_API_KEY`, `RETELL_AGENT_ID` | `create_web_call` with the six dynamic variables as strings and the box number in metadata. The browser joins with `retell-client-js-sdk` on the transport and ICE servers the call returns. The gateway transport streams no transcript to the browser, so the card shows the transcript when the call ends, within 3 seconds |
 | plus `RETELL_FROM_NUMBER` and `RETELL_PHONE_ENABLED=true` | `create_phone_call` from that number to the trucker phone on the appointment |
 | plus `PUBLIC_BASE_URL` from `make tunnel` | Retell can reach the custom functions `POST /api/retell/lookup` (inbound, "is my box ready") and `POST /api/retell/record` (outbound outcome). Both check `x-retell-signature` with `retell.verify` when a key is set |
 
-The Retell agent "Pier 7 gate desk" needs a post call analysis with the fields `outcome`
+`make retell-setup` builds the agent "Pier 7 gate desk" with the post call analysis fields `outcome`
 (confirmed_empty, confirmed_loaded, reschedule_accepted, unknown), `callback_needed`, and `notes`.
+When `record_outcome` runs during the call, the outcome lands on the card before the call ends.
 
 ## Layout
 
@@ -127,6 +145,7 @@ The Retell agent "Pier 7 gate desk" needs a post call analysis with the fields `
 | `backend/gate.py` | Pure `solve()` for gate re-slotting with `scipy.optimize.linear_sum_assignment` and a greedy fallback |
 | `backend/audit.py` | `audit.jsonl` writer and a 5000 line ring buffer |
 | `backend/main.py` | FastAPI routes, serves `frontend/dist` from the same origin |
+| `scripts/` | `retell_setup.py` for `make retell-setup`, `tunnel.py` for `make tunnel`, `track.py` for Terminal49 tracking requests, `envfile.py` to write `.env` |
 | `twists.json` | Twist log. One entry per merged TWIST: tag, text, received and merged times, files added |
 | `frontend/src/` | Vite, React, TypeScript, Tailwind, TanStack Query. `App.tsx` header and hash routes, `Queue.tsx`, `BoxCard.tsx`, `AskCall.tsx`, `Spoof.tsx`, `Gate.tsx`, `Audit.tsx` panels, `Decide.tsx` approve and override |
 | `tests/` | Engine, API, gate optimizer, voice, and Phase 5 feature tests |
