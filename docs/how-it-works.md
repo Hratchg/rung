@@ -249,7 +249,49 @@ newest first with a box filter, and each box card shows its own history.
 At `+00:10`, with lanes 4 to 6 closed, it moves 47 trucks and overflows 20 in under 1 ms. The target
 was 100 ms. The Gate screen compares Rung against the blunt move of closing the terminal: appointments
 kept (96 of 129 against 0), reefers kept, last free day boxes kept, throughput, released so far, and
-reefers past the loss limit.
+reefers past the loss limit. The gate API adds idle hours and CO2 to that comparison, see
+[Emissions](#emissions).
+
+## Emissions
+
+Rung limits delays and costs, and it counts emissions too: the CO2 trucks burn idling at the gate.
+Every idle number uses one factor, `KG_CO2_PER_IDLE_HOUR` in `backend/emissions.py`, 8.144 kg CO2
+per truck idle hour.
+
+- A heavy duty diesel truck burns about 0.8 gallon of diesel an hour at idle. DOE and Argonne National Laboratory, [Long-Haul Truck Idling Burns Up Profits](https://afdc.energy.gov/files/u/publication/hdv_idling_2015.pdf), 2015.
+- A gallon of diesel makes 10,180 g of CO2. EPA, [Greenhouse Gas Emissions from a Typical Passenger Vehicle](https://www.epa.gov/greenvehicles/greenhouse-gas-emissions-typical-passenger-vehicle), the factor from 40 CFR 600.113.
+- 0.8 times 10.18 is 8.144. EPA and ORNL measured 8.224 kg CO2 an hour on nine idling Class 8 trucks (SAE 2003-01-0288), a close cross check.
+
+Idle hours come from the gate plan. Each booked truck reaches the gate at the start of the window it
+was first booked for, and idles until it gets through or gives up. It gives up after one hour, the
+length of an appointment window and the hour after which Rung stops counting a truck as due.
+
+| Case | Idle for that truck |
+| --- | --- |
+| Kept in its booked hour, in any lane | 0 |
+| Moved to a later slot: SLOW, a closed lane, or a full lane | New slot start minus booked start, at most 1 h |
+| No open slot tonight (overflow) | 1 h, then turned away |
+| HOLD | 1 h, then turned away |
+| WATCH, ASK, or HAND on a dark feed it depends on, once its slot has started | The minutes it has waited since its slot started or the feed went dark, whichever is later. Nobody knows when the feed returns, so Rung does not guess |
+
+WATCH, ASK, and HAND for other reasons are taken to settle within the slot, because a re-poll, a
+reweigh, or a call takes minutes. The blunt move closes the terminal without a new plan, so every
+booked truck still comes and waits out its hour. "So far" counts the minutes each truck has already
+spent. A truck's idle is frozen when it gates out or its window ends, so the count never drops.
+
+| Where | Fields |
+| --- | --- |
+| `/api/queue` rows and `/api/box/{number}` | `idle`: expected `minutes`, `co2_kg`, `so_far_minutes`, `cause`, `settled`, and a `label`. Null when no truck is booked |
+| `/api/state` | `idle_hours` and `idle_co2_kg` so far tonight in `counters` and `counters_blunt`, and the factor with its sources in `emissions` |
+| `/api/gate` `moved`, `overflow`, `held` | `idle_minutes` and `co2_kg` for each truck |
+| `/api/gate` `compare` | `idle_hours_plan` and `idle_co2_kg_plan` for `rung` and `blunt`, then `idle_hours_avoided`, `idle_co2_kg_avoided`, and `idle_label` |
+
+On Tuesday at `+00:00` the plan idles only the 13 HOLD trucks: 13 h and 106 kg CO2, against 129 h and
+1,051 kg if the terminal closes. At `+00:10`, with lanes 4 to 6 closed, Rung keeps 89 trucks in their
+booked hour, moves 7 to a later hour, and overflows 20. Its plan idles the 129 trucks 40 h, 326 kg
+CO2. Closing the terminal idles them 129 h, 1,051 kg. Rung avoids 89 idle hours and 725 kg CO2.
+
+Emissions do not change the ladder or the optimizer cost, and `evaluate()` is untouched.
 
 ## The ask call
 
@@ -339,5 +381,5 @@ scripted `twist-1` placeholder.
 `make test` runs the pytest suite: the engine cases from the spec (the Harbor Night box, a clear box,
 a low urgency C2 box, a dark terminal with a pending release), the API and reset, the gate optimizer
 with lanes 4 to 6 closed, the voice paths with a fake Retell client, the Retell setup and tunnel
-scripts, fixture mode, and every Phase 5 feature. The suite blanks real keys, so it never calls an
-outside service.
+scripts, fixture mode, every Phase 5 feature, and the idle and CO2 numbers. The suite blanks real
+keys, so it never calls an outside service.

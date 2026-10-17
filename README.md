@@ -125,6 +125,7 @@ timeline and the matching API calls.
 | `backend/scenario.py` | Scenario clock, the seeded population, events, planner actions, rated orders, spoof input |
 | `backend/feeds.py` | Simulated reefer telemetry and weighbridge readings |
 | `backend/gate.py` | Gate re-slotting with `scipy.optimize.linear_sum_assignment` and a greedy fallback |
+| `backend/emissions.py` | Truck idle hours at the gate and the CO2 factor, with its sources |
 | `backend/voice.py` | Retell web and phone calls, signature checks, and the scripted simulated call |
 | `backend/t49.py` | Terminal49 poller with the fixture fallback |
 | `backend/audit.py`, `backend/gitdiff.py` | `audit.jsonl` writer and ring buffer, and the twist diff reader |
