@@ -735,7 +735,7 @@ def post_call(number: str, body: CallIn | None = None) -> dict:
         raise HTTPException(409, str(exc))
     outcome = (body.mock_outcome if body else None) or default_outcome(scenario.boxes[number].weight_case)
     try:
-        info = voice.start(variables, {"box": number}, phone, outcome)
+        info = voice.start(variables, {"box": number}, phone, outcome, simulate=bool(body and body.simulate))
     except ValueError as exc:
         raise HTTPException(409, str(exc))
     except Exception as exc:

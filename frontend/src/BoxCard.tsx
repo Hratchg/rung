@@ -1,11 +1,13 @@
 import { useState, type ReactNode } from 'react'
-import { ArrowLeft, CircleCheck, Database, FileText, Fuel, Phone, ScrollText, Snowflake, TriangleAlert, Vote } from 'lucide-react'
+import { ArrowLeft, CircleCheck, Database, FileText, Fuel, Phone, ScrollText, Siren, Snowflake, TriangleAlert, Vote } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SOURCE_NAMES, useAppState, useBox, type AuditLine, type Badge, type BoxDetail, type ConflictInfo, type Idle, type Silence, type SourceName, type Warmup } from './api'
 import AskCall from './AskCall'
 import { ACTOR, CONFLICT_COPY, IDLE_TONE, STEP_META, emissionsNote, nextStepLine, sentences, trustLevel } from './copy'
 import { OverrideDialog, PlannerActions } from './Decide'
 import { SOURCE_FIELDS, SOURCE_TITLE, sayDateTime, sayHours, sayKg, sayNum, sayTime, sayValue } from './format'
+import { MODE_COPY, crisisCauses, joinAnd, nightMode } from './mode'
 import { Notice, plainLfd } from './Queue'
 import { sourceVia } from './region'
 import SpoofForm from './Spoof'
@@ -23,6 +25,9 @@ const VALUE_LABELS: Record<string, string> = {
   pickup_lfd: 'Last free day',
   demurrage_usd: 'Demurrage',
 }
+
+const TAB =
+  'h-auto flex-none rounded-none px-4 py-2 text-lg font-semibold group-data-horizontal/tabs:after:bottom-[-2px] group-data-horizontal/tabs:after:h-[3px]'
 
 export default function BoxCard({ number, onAudit, onPrompt }: { number: string; onAudit: (box: string) => void; onPrompt: () => void }) {
   const box = useBox(number)
@@ -50,12 +55,20 @@ export default function BoxCard({ number, onAudit, onPrompt }: { number: string;
   const target = { number: b.number, step: d.step, engine_step: d.engine_step, planner: d.planner, fired: d.fired, conflicts: d.conflicts }
   const callUp = !!b.call || (b.ask.available && (!!b.ask.weight_case || (d.conflicts.includes('C1') && d.step === 'ASK')))
   const reeferUp = !!b.silence || (b.mode === 'harbor_night' && !!b.warmup && (!b.warmup.power_on || !!b.warmup.silent_since))
+  const causes = nightMode(b.mode) === 'crisis' ? crisisCauses(d.fired) : []
 
   return (
     <main className="mx-auto flex max-w-[1400px] flex-col gap-3 px-4 pt-3 pb-6">
       <Identity box={b} />
+      {causes.length > 0 && (
+        <p className="flex flex-wrap items-center gap-x-2 rounded-lg border-2 border-red-600 bg-red-50 px-3 py-1.5 text-lg text-red-950" aria-label="Crisis" data-demo="crisis-line">
+          <Siren className="size-5 text-red-700" aria-hidden />
+          <strong>{MODE_COPY.crisis.label}.</strong>
+          <span>This box is affected tonight because {joinAnd(causes)}.</span>
+        </p>
+      )}
 
-      <section className={`grid gap-6 rounded-xl border border-l-8 border-slate-200 bg-white p-5 shadow-sm lg:grid-cols-[1fr_280px] ${STEP_META[d.step].rail}`} aria-label="Decision">
+      <section className={`grid gap-6 rounded-xl border border-l-8 border-slate-200 bg-white p-5 shadow-sm lg:grid-cols-[1fr_280px] ${STEP_META[d.step].rail}`} aria-label="Decision" data-demo="decision">
         <div className="min-w-0">
           <p className="font-semibold text-slate-600">Rung recommends</p>
           <div className="mt-1 flex flex-wrap items-center gap-3">
@@ -102,33 +115,70 @@ export default function BoxCard({ number, onAudit, onPrompt }: { number: string;
       {callUp && <AskCall box={b} onPrompt={onPrompt} />}
       {reeferUp && <ReeferCard box={b} />}
 
-      <div className="grid gap-3 lg:grid-cols-2">
-        <WhyCard box={b} />
-        <Conflicts conflicts={b.conflicts} />
-      </div>
-
-      <Section title="Sources and trust" icon={<Database className="size-5 text-slate-500" aria-hidden />} summary={<TrustSummary box={b} />} label="Sources">
-        <p className="mb-3 text-slate-700">
-          Rung reads five sources for every box. Trust starts from how reliable a source is, fades as its reading ages, and drops for every conflict it is in. Hover a trust bar for the arithmetic.
-        </p>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          {SOURCE_NAMES.map((name) => (
-            <SourcePanel key={name} name={name} box={b} />
-          ))}
-        </div>
-      </Section>
-
-      {!callUp && (
-        <Section title="Call the trucker" icon={<Phone className="size-5 text-slate-500" aria-hidden />} summary="The voice agent can call the trucker about this box.">
-          <AskCall box={b} embedded onPrompt={onPrompt} />
-        </Section>
-      )}
-
-      <Section title="Full reason" icon={<FileText className="size-5 text-slate-500" aria-hidden />} summary="As written to the audit log">
-        <p className="text-xl leading-snug">{d.reason}</p>
-      </Section>
-
-      <History lines={b.history} onAudit={() => onAudit(b.number)} />
+      <Tabs defaultValue="why" className="mt-1 gap-3">
+        <TabsList variant="line" aria-label="Evidence" className="w-full flex-wrap justify-start gap-0 rounded-none border-b-2 border-slate-200 p-0 group-data-horizontal/tabs:h-auto">
+          <TabsTrigger value="why" className={TAB}>
+            <Vote className="size-5" aria-hidden />
+            Why Rung says {STEP_META[d.engine_step].word}
+            {b.conflicts.length > 0 && <span className="rounded bg-red-700 px-1.5 text-base text-white">{b.conflicts.length} disagree</span>}
+          </TabsTrigger>
+          <TabsTrigger value="sources" className={TAB} data-demo="tab-sources">
+            <Database className="size-5" aria-hidden />
+            Sources and trust
+          </TabsTrigger>
+          {!callUp && (
+            <TabsTrigger value="call" className={TAB}>
+              <Phone className="size-5" aria-hidden />
+              Call the trucker
+            </TabsTrigger>
+          )}
+          <TabsTrigger value="history" className={TAB}>
+            <ScrollText className="size-5" aria-hidden />
+            Reason and history
+            <span className="font-normal text-slate-500">{b.history.length}</span>
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="why" className="text-base">
+          <div className="grid gap-3 lg:grid-cols-2">
+            <WhyCard box={b} />
+            <Conflicts conflicts={b.conflicts} />
+          </div>
+        </TabsContent>
+        <TabsContent value="sources" className="text-base">
+          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" aria-label="Sources" data-demo="sources">
+            <p className="text-slate-700">
+              Rung reads five sources for every box. Trust starts from how reliable a source is, fades as its reading ages, and drops for every conflict it is in. Hover a trust bar for the arithmetic.
+            </p>
+            <p className="mt-1 mb-3">
+              <TrustSummary box={b} />
+            </p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              {SOURCE_NAMES.map((name) => (
+                <SourcePanel key={name} name={name} box={b} />
+              ))}
+            </div>
+          </section>
+        </TabsContent>
+        {!callUp && (
+          <TabsContent value="call" className="text-base">
+            <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" aria-label="Call the trucker">
+              <p className="mb-2 text-slate-700">The voice agent can call the trucker about this box.</p>
+              <AskCall box={b} embedded onPrompt={onPrompt} />
+            </section>
+          </TabsContent>
+        )}
+        <TabsContent value="history" className="flex flex-col gap-3 text-base">
+          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" aria-label="Full reason">
+            <h3 className="flex flex-wrap items-center gap-2 text-lg font-bold">
+              <FileText className="size-5 text-slate-500" aria-hidden />
+              Full reason
+              <span className="font-normal text-slate-600">As written to the audit log</span>
+            </h3>
+            <p className="mt-1 text-xl leading-snug">{d.reason}</p>
+          </section>
+          <History lines={b.history} onAudit={() => onAudit(b.number)} />
+        </TabsContent>
+      </Tabs>
 
       <Section title="Demo: fake a reading" tone="demo" summary="For judges. Type a fake weight or toggle a hold and watch Rung react." label="Spoof input">
         <SpoofForm key={b.number} box={b} />
@@ -242,7 +292,7 @@ function WhyCard({ box }: { box: BoxDetail }) {
 function Conflicts({ conflicts }: { conflicts: ConflictInfo[] }) {
   if (conflicts.length === 0) {
     return (
-      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" aria-label="Conflicts">
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" aria-label="Conflicts" data-demo="conflicts">
         <h3 className="flex items-center gap-2 text-lg font-bold">
           <CircleCheck className="size-5 text-emerald-700" aria-hidden />
           Where the sources disagree
@@ -252,7 +302,7 @@ function Conflicts({ conflicts }: { conflicts: ConflictInfo[] }) {
     )
   }
   return (
-    <section className="rounded-xl border-2 border-red-300 bg-red-50 p-4" aria-label="Conflicts">
+    <section className="rounded-xl border-2 border-red-300 bg-red-50 p-4" aria-label="Conflicts" data-demo="conflicts">
       <h3 className="flex items-center gap-2 text-lg font-bold text-red-900">
         <TriangleAlert className="size-5" aria-hidden />
         Where the sources disagree
@@ -352,7 +402,7 @@ function ReeferCard({ box }: { box: BoxDetail }) {
   const cargo = box.sources.reefer?.fields.cargo
   const showClock = box.mode === 'harbor_night' && box.warmup
   return (
-    <section className="flex flex-wrap items-start gap-x-8 gap-y-3 rounded-xl border-2 border-amber-400 bg-amber-50 p-4" aria-label="Reefer">
+    <section className="flex flex-wrap items-start gap-x-8 gap-y-3 rounded-xl border-2 border-amber-400 bg-amber-50 p-4" aria-label="Reefer" data-demo="reefer-card">
       <div className="flex items-center gap-2">
         <Snowflake className="size-6 text-sky-700" aria-hidden />
         <div>
@@ -419,9 +469,14 @@ function History({ lines, onAudit }: { lines: AuditLine[]; onAudit: () => void }
     ? `${lines.length} ${lines.length === 1 ? 'entry' : 'entries'}. Latest ${sayTime(latest.ts)}, ${(ACTOR[latest.actor] ?? ACTOR.engine).label} set ${STEP_META[latest.step].word}`
     : 'Nothing since the last reset'
   return (
-    <Section title="Decision history" icon={<ScrollText className="size-5 text-slate-500" aria-hidden />} summary={summary} label="Decision history">
-      <div className="flex justify-end">
-        <Button variant="outline" onClick={onAudit}>
+    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" aria-label="Decision history">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <h3 className="flex items-center gap-2 text-lg font-bold">
+          <ScrollText className="size-5 text-slate-500" aria-hidden />
+          Decision history
+        </h3>
+        <span className="text-slate-600">{summary}</span>
+        <Button variant="outline" className="ml-auto" onClick={onAudit}>
           Open in audit log
         </Button>
       </div>
@@ -448,6 +503,6 @@ function History({ lines, onAudit }: { lines: AuditLine[]; onAudit: () => void }
           ))}
         </ol>
       )}
-    </Section>
+    </section>
   )
 }

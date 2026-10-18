@@ -452,7 +452,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>
 }
 
-const post = <T>(path: string, body: unknown) => request<T>(path, { method: 'POST', body: JSON.stringify(body) })
+export const post = <T>(path: string, body: unknown) => request<T>(path, { method: 'POST', body: JSON.stringify(body) })
 
 export function useAppState() {
   return useQuery({ queryKey: ['state'], queryFn: () => request<State>('/api/state') })
@@ -577,5 +577,6 @@ export function useScenarioControls() {
     mutationFn: (event: ScenarioEvent) => post<State & { applied: ScenarioEvent }>('/api/scenario/event', event),
     onSuccess: refresh,
   })
-  return { reset, speed, fire }
+  const jump = useMutation({ mutationFn: (t: string) => post<State>('/api/scenario/jump', { t }), onSuccess: refresh })
+  return { reset, speed, fire, jump }
 }

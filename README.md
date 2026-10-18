@@ -26,6 +26,7 @@ hands the planner only the boxes that need a person.
 - [UI guide](docs/ui-guide.md): a 60 second tour, every screen with annotated screenshots, a plain language glossary of every term on screen, and common questions. Start here if you have no port or logistics background.
 - [Rung, global](docs/global.md): what stays the same in every port, what changes in Rotterdam, Shanghai, Singapore, and Lagos, and the region switch in the header.
 - [How Rung works](docs/how-it-works.md): architecture, trust, conflicts, urgency, the rules, the optimizer, the voice call, and what is live versus simulated.
+- [Demo script](docs/demo-script.md): the narration for demo mode, timed to the second, with two ways to add your voice and a rules checklist for the video.
 - [Demo pitch](docs/demo-pitch.md): a pitch that fits in 2:51 with the live voice call and all three hackathon twists, a click by click run of show, a 30 second version, and a judges Q&A sheet.
 - [Funding pathway](docs/funding-pathway.md): the federal funding plan, with sources. An NSF SBIR Phase I grant to launch, DoD through USTRANSCOM and SDDC for the Harbor Night dual use, and port-led MARAD grants to roll out.
 - [Demo Day poster](docs/poster/): the 24 by 36 inch poster, its HTML and CSS source, and the print file `rung-poster.pdf`.
@@ -48,11 +49,24 @@ picks another port, and `HOST=0.0.0.0 make demo` listens on every interface.
 No keys and no network are needed. With an empty `.env`, every box is simulated, **Call the trucker**
 plays a scripted simulated call, and the scenario runs the same way every time.
 
+### Demo mode
+
+Press **Play demo** in the Demo controls dock, or open http://127.0.0.1:8000/?demo=1. Rung resets the
+night, pauses the clock, and plays a 2:46 tour on its own, with a spotlight and a lower third for each
+chapter: Everyday mode, a weight conflict, the trucker call, the Retell AI prompt at 1:02, Crisis mode,
+the 21 Hand boxes, the reefer that cannot go, the audit log, and Rotterdam. **Esc** stops it. The call
+in demo mode is always the simulated one, even with Retell keys loaded, so every take is the same.
+
+The narration to read along with, and two ways to record your voice over it, are in the
+[demo script](docs/demo-script.md). The timeline lives in `frontend/src/demoScript.ts`, and
+`npm run demo-script` in `frontend` writes the script and its subtitles from it.
+
 | Command | What it does |
 | --- | --- |
 | `make demo` | Install if needed, build, and serve on one port |
 | `make test` | Run the pytest suite |
-| `cd frontend && npm test` | Run the Vitest suite: the UI copy rules, the ladder helpers, and the prompt drawer parser |
+| `cd frontend && npm test` | Run the Vitest suite: the UI copy rules, the ladder helpers, the prompt drawer parser, and the demo timeline |
+| `cd frontend && npm run demo-script` | Write `docs/demo-script.md` and `docs/demo-script.srt` from the demo timeline |
 | `make dev` | Hot reload: uvicorn on port 8000 plus the Vite dev server, with `/api` proxied to port 8000 |
 | `make setup` | Install only |
 | `make build` | Build the frontend into `frontend/dist` |
@@ -106,24 +120,27 @@ browser, and its chip reads **Retell web call**. Allow the microphone, and answe
 
 | Feature | Where | What you see |
 | --- | --- | --- |
-| Queue | Queue tab | A headline with how many boxes need a decision, the ladder strip with a count per step (click a step to filter), and one row per box with plain issue tags, urgency in words, clocks, live or simulated badges, and one main button named for the action. A dray carrier filter and **Show only these** for the boxes that need you |
+| Everyday and Crisis mode | Header pill, top of the Queue | Every screen says which mode the night is in. **Everyday mode** (an ordinary night, sky blue) shows a calm summary: lanes open, feeds reporting, and any issue to watch. **Crisis mode** (Harbor Night, red) leads with how many trucks Rung keeps moving against closing the terminal, then one card per problem tonight, each with a link to act on it. **Tonight so far** shows the three numbers that matter in the mode, with **All numbers** for the rest |
+| Queue | Queue tab | A headline with how many boxes need a decision, the ladder strip with a count per step (click a step to filter), and one row per box. **Simple** view shows the box, Rung's step, plain issue tags, and one main button named for the action, with **Details** for urgency, booking, clocks, and the reason. **Detailed** view shows all of it in every row. A dray carrier filter and **Show only these** for the boxes that need you |
 | The ladder | Queue, **How the ladder works** | Every step, what it means at the gate, who acts, and how the rule votes are counted |
-| Box card | Click a box number | What Rung recommends and the next step in one sentence, with **Your move** beside it. Then the call panel and reefer card when they matter, the rule votes, and where the sources disagree. Sources and trust, the full reason, and the history open on demand |
+| Box card | Click a box number | What Rung recommends and the next step in one sentence, with **Your move** beside it. In Crisis mode, a red line says why tonight's crisis touches this box. Then the call panel and reefer card when they matter, and tabs for the rule votes and where the sources disagree, sources and trust, the trucker call, and the reason and history |
 | Ask call | Box card, **Call the trucker** | The voice agent calls the trucker about a weight conflict. The transcript and outcome land on the card and re-evaluate the box |
 | Voice agent prompt | **See the agent prompt** on the box card, or **Voice agent prompt** in the dock | The exact Retell prompt from `scripts/retell_setup.py`, the values filled in for each call, the tools, and the fields read back after the call |
-| Truck idle and CO2 | Header, box card, Gate plan | Modelled idle hours and kg CO2 for trucks waiting at the gate: so far tonight in the header, per truck on the box card and the gate lists, and saved against closing the terminal in the gate headline. The factor and its DOE and EPA sources sit behind an info icon and in a footnote |
-| Region switch | Header, next to the terminal name | Los Angeles, Rotterdam, or Shanghai. Swaps lb or kg, USD, EUR, or CNY, customs and hold owner names, adapter names, the CO2 label, and the time zone label. Decisions never change |
-| Gate plan | Gate plan tab | A headline against closing the terminal, lanes by hourly windows with lane toggles, **Moved to a new slot**, and **No slot tonight** |
+| Truck idle and CO2 | Tonight so far, box card, Gate plan | Modelled idle hours and kg CO2 for trucks waiting at the gate: so far tonight in **Tonight so far**, per truck on the box card and the gate lists, and saved against closing the terminal in the crisis summary and the gate headline. The factor and its DOE and EPA sources sit behind an info icon and in a footnote |
+| Region switch | Header, status line | Los Angeles, Rotterdam, or Shanghai. Swaps lb or kg, USD, EUR, or CNY, customs and hold owner names, adapter names, the CO2 label, and the time zone label. Decisions never change |
+| Gate plan | Gate plan tab | In Everyday mode, how many booked trucks have a slot, with **Compare with closing the terminal** one click away. In Crisis mode, a headline and side by side numbers against closing the terminal. Then lanes by hourly windows with lane toggles, **Moved to a new slot**, and **No slot tonight** |
 | Audit log | Audit log tab | Every decision line newest first with the reason first, filtered by box |
 | Dark feed banner | Header | Shows how long a feed has been dark. The queue keeps running from the last snapshot |
 | Fake a reading | Box card, **Demo: fake a reading** | Type a fake carrier weight or toggle a hold, and watch trust and the step change at once |
 | Rated orders | Dock, **More controls** | Six listed boxes get a 03:00 gate out deadline, plus 50 urgency, and first claim on the gate. Boxes that slid show under **No slot tonight** |
 | Silent reefer classifier | Dock, **More controls**, **Reefer fault** | Cut power, trip a circuit, drop telemetry, or fail a unit. Rung tells a tripped circuit from a failed unit from a telemetry fault |
 | Twist log | Dock, **More controls**, **Twist log** | Each twist tag, what it added, when it merged, and the git diff of its commits |
+| Demo mode | Dock, **Play demo**, or `?demo=1` | A 2:46 tour that plays on its own for the demo video, with a spotlight, a lower third per chapter, and a title and closing card. **Esc** stops it |
 
 The dashed amber **Demo controls** dock at the bottom drives the scenario and is not part of the
-planner's app: **Reset**, **Minutes per second** (Pause stops the clock), the next scripted event, and
-**More controls** with Close lanes 4 to 6, Customs hold on TCLU7654321, Cut terminal feed, the reefer
+planner's app: **Everyday** (start over at 22:00 on Tuesday), **Crisis** (jump to 22:44 on Harbor
+Night, after the scripted crisis events), **Speed** in scenario minutes per second (Pause stops the
+clock), **Play demo** (the narrated tour above), **Voice agent prompt**, and **More controls** with Close lanes 4 to 6, Customs hold on TCLU7654321, Cut terminal feed, the reefer
 faults, and rated orders. The scripted Harbor Night events fire on their own as the clock passes them.
 See [How Rung works](docs/how-it-works.md#the-scenario) for the timeline and the matching API calls,
 and the [UI guide](docs/ui-guide.md) for an annotated tour of every screen and a glossary of every term.
@@ -144,6 +161,8 @@ and the [UI guide](docs/ui-guide.md) for an annotated tour of every screen and a
 | `backend/main.py` | FastAPI routes. Serves `frontend/dist` from the same origin |
 | `frontend/src/` | Vite, React, TypeScript, Tailwind, TanStack Query, shadcn/ui primitives on Radix in `components/ui` |
 | `frontend/src/copy.ts` | Every plain language label: step meanings, rule tags, planner verbs, event lines |
+| `frontend/src/demoScript.ts`, `DemoPlayer.tsx` | The demo mode timeline as data, and the player that runs it |
+| `frontend/scripts/demo-script.ts` | Writes the demo script and its subtitles from the timeline |
 | `scripts/` | `retell_setup.py`, `tunnel.py`, `track.py`, `envfile.py` |
 | `scenario.json`, `fixtures/`, `twists.json` | The scenario, the Terminal49 fixture, and the twist log |
 | `tests/` | Engine, API, gate, voice, live setup, and Phase 5 tests |

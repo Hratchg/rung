@@ -15,13 +15,17 @@ The three twists, and where each one shows:
 
 The **Twist log** at 2:20 shows all three as merged, with the files each one added and its git diff.
 
+This page is for presenting live. For the recorded demo video, use demo mode instead: **Play demo** in
+the dock, or http://127.0.0.1:8000/?demo=1, plays the whole story on its own in 2:46, with the Retell AI
+prompt at 1:02. The [demo script](demo-script.md) has the narration timed to it, two ways to add your
+voice, and a rules checklist.
+
 ## Before you go on
 
 1. Start the app with `make demo`. For the live call, set it up beforehand: `make tunnel` in a second terminal, `make retell-setup` once, then restart `make demo`. The steps are in the [README](../README.md#a-live-retell-call). A quick tunnel can expire. If calls stop recording an outcome, stop `make tunnel` and start it again. It points the Retell agent at the new address on its own.
 2. Open http://127.0.0.1:8000 in a browser sized for the projector, 1280 by 720 or larger. Open `docs/poster/rung-poster.pdf` in a second tab of the same browser.
-3. Make one test call on any box, so the browser has already granted the microphone. Then press **Reset** in the dock.
-4. Check that the **Region** menu in the header reads **Los Angeles**. In the dock, press **Pause** next to **Minutes per second**. The header should read Tuesday, 22:00, Lanes open 6 of 6, and the dock should read Scenario `+00:00`.
-5. Open `CMAU9939083` and check the chip in the **Call the trucker** panel. **Retell web call** means the live agent is loaded. **Simulated call** means no Retell key is loaded and the call will be the scripted one. That still works: leave **The simulated trucker answers** on **Trucker backs the scale**.
+3. Make one test call on any box, so the browser has already granted the microphone. Then press **Everyday** in the dock to start the night over.
+4. Check that the **Region** menu in the status line under the header reads **Los Angeles**. In the dock, press **Pause** next to **Speed**. The header should read **Everyday mode**, Tuesday, 22:00, the summary at the top of the Queue should read 6 of 6 lanes open, and the dock should read Scenario `+00:00`.5. Open `CMAU9939083` and check the chip in the **Call the trucker** panel. **Retell web call** means the live agent is loaded. **Simulated call** means no Retell key is loaded and the call will be the scripted one. That still works: leave **The simulated trucker answers** on **Trucker backs the scale**.
 6. Close every terminal and editor window. Never put `.env` or a terminal on the projector.
 7. Rehearse the call once with a stopwatch. With the three trucker lines below, the answer lands about 35 seconds after you press **Call the trucker**, and the agent hangs up about 60 seconds after it. If the answer takes longer, use the cut rules at the end of the run of show.
 
@@ -58,8 +62,9 @@ Screen: the Queue, Tuesday, clock paused at 22:00.
 
 ### 0:09 Tuesday: the queue and the ladder (12 s)
 
-Screen: the Queue. Point at the headline **34 boxes need your decision**, then sweep left to right
-across the ladder: Release, Watch, Ask, Slow, Hold, and Hand set apart on the right.
+Screen: the Queue. Point at the **Everyday mode** pill in the header, then the headline **34 boxes
+need your decision**, then sweep left to right across the ladder: Release, Watch, Ask, Slow, Hold,
+and Hand set apart on the right.
 
 > This is Rung at Pier 7, Los Angeles. It reads all five sources for each of 191 boxes and puts each
 > one on the gentlest safe step, from Release to Hand.
@@ -109,16 +114,15 @@ Wait until the agent hangs up, about 60 seconds after the click, then press **Es
 
 ### 1:25 Harbor Night: the gate plan and the CO2 (29 s)
 
-Click: the **Gate plan** tab. Then press **2** next to **Minutes per second** in the dock. Every
-scenario minute now takes half a real second, and the scripted events fire on their own.
+Click: the **Gate plan** tab. Then press **2** next to **Speed** in the dock. Every scenario minute
+now takes half a real second, and the scripted events fire on their own.
 
 > Same app, the worst night of the year: Harbor Night.
 
-- After 3 seconds the header turns dark blue and the chip reads **Harbor Night**.
-- After 5 seconds lanes 4 to 6 close. The header reads Lanes open 3 of 6, Closed 4 to 6.
+- After 3 seconds the header turns dark blue and the pill reads **Crisis mode**, next to **Harbor Night**.
+- After 5 seconds lanes 4 to 6 close. The red summary reads **Lanes 4 to 6 are closed. Rung keeps 96 of 129 trucks moving**, with the idle hours and CO2 it saves.
 - After 10 seconds a customs hold lands on `TCLU7654321`. Press **5** to speed up.
 - About 4 seconds later the red **Terminal feed dark** banner appears. Press **Pause** right away. The dock reads `+00:40`.
-
 > Lanes 4 to 6 close, and Rung re-plans every booked truck in under a millisecond, reefers and last
 > free day boxes first. A customs hold lands, and the terminal feed goes dark. Rung keeps running from
 > its last snapshot, and only trucks due at the gate now come to the planner.
@@ -135,12 +139,12 @@ line is the difference. The plan changes as the night moves, so these numbers dr
 
 ### 1:54 The box that matters (9 s)
 
-Click: the **Queue** tab, then **MSKU1234567** in the Hold group. If it is below the fold, press the
-**Hold** step in the ladder first.
-
-Screen: the big card reads **HOLD, Waits for its owner** and **Keep this truck at the gate until the
-customs broker clears it. The reefer evidence goes with it.** The amber reefer card below it reads
-**Product passed 2.6 C at 21:53**.
+Click: the **Queue** tab. The red **What went wrong tonight** cards name each problem. Click
+**MSKU1234567** in the Hold group. If it is below the fold, press the **Hold** step in the ladder first.
+Screen: a red line reads **Crisis mode. This box is affected tonight because its lane is closed, a
+feed it needs is dark and its reefer is in trouble under a hold.** The big card reads **HOLD, Waits
+for its owner** and **Keep this truck at the gate until the customs broker clears it. The reefer
+evidence goes with it.** The amber reefer card below it reads **Product passed 2.6 C at 21:53**.
 
 > Chilled beef, under a customs hold, power off and warming. Rung says Hold, names the owner, and
 > attaches the reefer evidence. The planner confirms with one tap, and it lands in the audit log.
@@ -155,11 +159,11 @@ Keep the **Owner** row of the big card in view.
 
 > Twist two: go global. Same box, same engine. Switch the port from Los Angeles to Rotterdam.
 
-Click: the **Region** menu in the header, which reads **Los Angeles**, then **Rotterdam**. Point at what
-changed:
+Click: the **Region** menu in the status line under the header, which reads **Los Angeles**, then
+**Rotterdam**. Point at what changed:
 
-- The clock label reads **CEST**, and **Fees avoided** reads **0 EUR**.
-- The data chip reads **All data simulated. Portbase adapter not connected**.
+- The clock label in the header reads **CEST**.
+- The status line reads **All data simulated. Portbase adapter not connected**.
 - **Owner** reads **customs agent**.
 - The conflict reads **Manifest says 1,089 kg** and **Scale says 20,003 kg**.
 - The ladder still shows **Hold**, and **Urgency** still reads **95 High**.
@@ -167,8 +171,8 @@ changed:
 > Rotterdam: Dutch Customs, so a customs agent owns the hold. The weights read in kilograms, fees in
 > euros, times in CEST. Still Hold, same urgency.
 
-Click: the **Region** menu, then **Shanghai**. The clock label reads **CST**, fees read **CNY**, the chip
-names the **China Single Window** adapter, and **Owner** reads **customs declaration agent**.
+Click: the **Region** menu, then **Shanghai**. The clock label reads **CST**, the status line names the
+**China Single Window** adapter, and **Owner** reads **customs declaration agent**.
 
 > Shanghai: China Customs and a customs declaration agent, yuan and CST. The ladder, trust, and gate
 > plan never change. Only the edges do.
@@ -226,17 +230,17 @@ band, then on the header, **Keep the gate open when the data goes bad.**
 
 ## The 30 second version
 
-Set up first: **Reset**, press **2** next to **Minutes per second**, open the **Gate plan** tab, and wait
-for the **Terminal feed dark** banner. Then press **Pause**.
+Set up first: press **Pause**, then **Crisis** in the dock, and open the **Gate plan** tab. The clock
+jumps to 22:44 on Harbor Night with every scripted crisis event fired, and stays paused. On the
+fourth sentence, click the **Queue** tab. The **Hand** step in the ladder reads 21.
 
 > Container terminals close the gate when their data goes bad, and every truck in line pays for it.
 > Rung reads five sources for every box, trusts each one as much as it has earned, and picks the
 > gentlest safe step, from Release to Hand. Tonight half our lanes are down and the terminal feed is
-> dark, and Rung still keeps 96 of 129 trucks moving, every reefer included. When the paperwork and
-> the scale disagree, it calls the trucker with a voice agent and writes the answer into an audit
-> log. The same engine runs in Rotterdam and Shanghai with only the edges changed, and it launches on
-> an NSF SBIR Phase I grant.
-
+> dark, and Rung still keeps 96 of 129 trucks moving. Only the 21 trucks due now go to a person. When
+> the paperwork and the scale disagree, it calls the trucker with a voice agent and writes the answer
+> into an audit log. The same engine runs in Rotterdam and Shanghai with only the edges changed, and it
+> launches on an NSF SBIR Phase I grant.
 ## Judges Q&A
 
 **Is any of this real data?**
@@ -279,7 +283,7 @@ adapters, units and currency, the customs authority and who owns a hold, and the
 Rotterdam, and Shanghai, and that the engine and rule files never import the region code.
 
 **Are Portbase and the China Single Window connected?**
-No. They are named stubs, and the chip in the header says so. Terminal49 is the only live adapter.
+No. They are named stubs, and the status line under the header says so. Terminal49 is the only live adapter.
 The exchange rates are fixed demo rates, EUR at 0.86 and CNY at 7.1 per USD, labeled as such.
 [global.md](global.md) covers what a real rollout needs, port by port, including Singapore and Lagos.
 

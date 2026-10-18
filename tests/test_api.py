@@ -106,6 +106,19 @@ def test_scripted_events_fire_on_jump(client):
     assert row["step"] == "HOLD" and row["owner"] == "customs broker"
 
 
+def test_direct_jump_matches_minute_by_minute(client):
+    def steps():
+        rows = client.get("/api/queue").json()
+        return {s: sum(r["step"] == s for r in rows) for s in ("HAND", "SLOW", "WATCH", "HOLD", "ASK")}
+
+    client.post("/api/scenario/jump", json={"t": "+00:44"})
+    direct = steps()
+    client.post("/api/scenario/reset")
+    for minute in range(1, 45):
+        client.post("/api/scenario/jump", json={"t": f"+00:{minute:02d}"})
+    assert direct == steps() == {"HAND": 21, "SLOW": 58, "WATCH": 106, "HOLD": 5, "ASK": 1}
+
+
 def test_approve_release_removes_box_and_counts(client):
     row = next(r for r in client.get("/api/queue").json() if r["step"] == "RELEASE" and not r["hand"])
     res = client.post("/api/decision", json={"box": row["number"], "action": "approve"})

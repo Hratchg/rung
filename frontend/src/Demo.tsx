@@ -1,11 +1,21 @@
 import { useState } from 'react'
-import { Check, ChevronUp, FileText, FlaskConical, RotateCcw } from 'lucide-react'
+import { Check, ChevronUp, FileText, FlaskConical, Play, RotateCcw, Siren } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useRatedToggle, useScenarioControls, type ScenarioEvent, type State } from './api'
 import { DEMO_NOTE, describeEvent } from './copy'
 import { laneList, sayTime } from './format'
+import { nightMode } from './mode'
 
 const SPEEDS = [0, 1, 2, 5, 10]
+
+const CRISIS_AT = '+00:44'
+
+function clockAfter(startIso: string, offset: string): string {
+  const [h, m] = startIso.slice(11, 16).split(':').map(Number)
+  const [oh, om] = offset.slice(1).split(':').map(Number)
+  const total = (h * 60 + m + oh * 60 + om) % 1440
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+}
 
 type ReeferAction = 'power' | 'trip' | 'telemetry' | 'fail'
 
@@ -100,9 +110,40 @@ function RatedSwitch({ rated }: { rated: State['rated'] }) {
   )
 }
 
-export default function DemoDock({ state, onTwist, onPrompt }: { state: State; onTwist: () => void; onPrompt: () => void }) {
+function NightSwitch({ state, busy, onEveryday, onCrisis }: { state: State; busy: boolean; onEveryday: () => void; onCrisis: () => void }) {
+  const crisis = nightMode(state.mode) === 'crisis'
+  return (
+    <div className="flex items-center gap-1" role="group" aria-label="Jump to a night">
+      <span className="mr-1 hidden text-zinc-300 sm:inline">Night</span>
+      <Button
+        variant="demo"
+        size="sm"
+        aria-pressed={!crisis}
+        disabled={busy}
+        title="Start over at 22:00 on an ordinary Tuesday. Clears every decision, call, and spoof."
+        onClick={onEveryday}
+      >
+        <RotateCcw aria-hidden />
+        Everyday
+      </Button>
+      <Button
+        variant="demo"
+        size="sm"
+        aria-pressed={crisis}
+        disabled={busy}
+        title={`Jump to ${clockAfter(state.clock_start, CRISIS_AT)} on Harbor Night, after the scripted crisis events have fired.`}
+        onClick={onCrisis}
+      >
+        <Siren aria-hidden />
+        Crisis
+      </Button>
+    </div>
+  )
+}
+
+export default function DemoDock({ state, onTwist, onPrompt, onDemo }: { state: State; onTwist: () => void; onPrompt: () => void; onDemo: () => void }) {
   const [open, setOpen] = useState(false)
-  const { reset, speed, fire } = useScenarioControls()
+  const { reset, speed, fire, jump } = useScenarioControls()
   const scripted = (type: string) => state.scripted_events.find((e) => e.type === type)
   const lanesEvent = scripted('lanes_down')
   const holdEvent = scripted('hold_placed')
@@ -113,8 +154,8 @@ export default function DemoDock({ state, onTwist, onPrompt }: { state: State; o
   const lanesClosed = lanes.length > 0 && lanes.every((l) => !state.lanes_open.includes(l))
   const darkSource = (darkEvent?.source as string | undefined) ?? 'terminal'
   const isDark = state.dark_sources.includes(darkSource)
-  const busy = reset.isPending || fire.isPending || speed.isPending
-  const error = reset.error ?? fire.error ?? speed.error
+  const busy = reset.isPending || fire.isPending || speed.isPending || jump.isPending
+  const error = reset.error ?? fire.error ?? speed.error ?? jump.error
   const note = fire.isSuccess ? appliedNote(fire.data.applied) : null
 
   return (
@@ -158,10 +199,14 @@ export default function DemoDock({ state, onTwist, onPrompt }: { state: State; o
                   </li>
                 ))}
               </ol>
-              <div>
+              <div className="flex flex-wrap gap-2">
                 <Button variant="demo" size="sm" onClick={onTwist}>
                   <FlaskConical aria-hidden />
                   Twist log
+                </Button>
+                <Button variant="demo" size="sm" className="sm:hidden" onClick={onPrompt}>
+                  <FileText aria-hidden />
+                  Voice agent prompt
                 </Button>
               </div>
             </div>
@@ -169,23 +214,24 @@ export default function DemoDock({ state, onTwist, onPrompt }: { state: State; o
         </div>
       )}
       <div className="flex min-h-14 flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2">
-        <span className="rounded-md bg-amber-400 px-2 py-0.5 font-bold text-zinc-950">Demo controls</span>
-        <span className="tabular-nums text-zinc-300">
+        <span className="rounded-md bg-amber-400 px-2 py-0.5 font-bold text-zinc-950">
+          Demo<span className="hidden sm:inline"> controls</span>
+        </span>
+        <span className="hidden tabular-nums text-zinc-300 sm:inline">
           Scenario <span className="font-mono font-semibold text-zinc-50">{state.offset}</span>
         </span>
-        <Button variant="demo" size="sm" disabled={busy} onClick={() => reset.mutate()}>
-          <RotateCcw aria-hidden />
-          Reset
-        </Button>
+        <NightSwitch state={state} busy={busy} onEveryday={() => reset.mutate()} onCrisis={() => jump.mutate(CRISIS_AT)} />
         <div className="flex items-center gap-1" role="group" aria-label="Speed in scenario minutes per second">
-          <span className="mr-1 text-zinc-300">Minutes per second</span>
+          <span className="mr-1 hidden text-zinc-300 sm:inline" title="Scenario minutes for each real second">
+            Speed
+          </span>
           {SPEEDS.map((s) => (
             <Button key={s} variant="demo" size="sm" className="px-2.5" aria-pressed={state.minutes_per_second === s} onClick={() => speed.mutate(s)}>
               {s === 0 ? 'Pause' : s}
             </Button>
           ))}
         </div>
-        <span className="min-w-0 flex-1 basis-0 truncate text-zinc-300">
+        <span className="hidden min-w-0 flex-1 basis-0 truncate text-zinc-300 2xl:inline">
           {next ? (
             <>
               Next <span className="font-mono">{next.t}</span> {describeEvent(next)}
@@ -196,14 +242,27 @@ export default function DemoDock({ state, onTwist, onPrompt }: { state: State; o
         </span>
         {error && <span className="rounded bg-red-100 px-2 text-red-900">{error.message}</span>}
         {note && <span className="rounded bg-amber-100 px-2 text-amber-950">{note}</span>}
-        <Button variant="demo" size="sm" onClick={onPrompt}>
-          <FileText aria-hidden />
-          Voice agent prompt
-        </Button>
-        <Button variant="demo" size="sm" aria-expanded={open} onClick={() => setOpen(!open)}>
-          {open ? 'Fewer controls' : 'More controls'}
-          <ChevronUp className={`transition-transform duration-150 ${open ? 'rotate-180' : ''}`} aria-hidden />
-        </Button>
+        <div className="ml-auto flex items-center gap-2">
+          <Button
+            variant="demo"
+            size="sm"
+            data-demo="play-demo"
+            title="Play the guided tour of the whole story, about 2 minutes 46 seconds. It starts the night over. Press Esc to stop."
+            onClick={onDemo}
+          >
+            <Play aria-hidden />
+            Play demo
+          </Button>
+          <Button variant="demo" size="sm" className="hidden sm:inline-flex" onClick={onPrompt}>
+            <FileText aria-hidden />
+            Voice agent prompt
+          </Button>
+          <Button variant="demo" size="sm" aria-expanded={open} onClick={() => setOpen(!open)}>
+            {open ? 'Fewer' : 'More'}
+            <span className="hidden sm:inline"> controls</span>
+            <ChevronUp className={`transition-transform duration-150 ${open ? 'rotate-180' : ''}`} aria-hidden />
+          </Button>
+        </div>
       </div>
     </section>
   )

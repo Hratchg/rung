@@ -25,6 +25,8 @@ const MODE_TEXT = {
   phone: 'A live voice agent calls the trucker phone on the appointment through Retell.',
 }
 
+const SIMULATED_ON_REQUEST = 'This call is the scripted one, played on request. The live Retell agent was not called.'
+
 type Live = { status: 'connecting' | 'on' | 'ended' | 'error'; transcript: TranscriptLine[]; error?: string }
 type RetellClient = { stopCall: () => void }
 
@@ -36,6 +38,7 @@ export default function AskCall({ box, embedded = false, onPrompt }: { box: BoxD
   useEffect(() => () => client.current?.stopCall(), [])
 
   const call = box.call
+  const simulated = box.ask.mode === 'mock' || !!call?.mock
   const active = !!call && (call.outcome === null || !['ended', 'error', 'not_connected'].includes(call.status))
   const liveOn = live?.status === 'connecting' || live?.status === 'on'
   const transcript = live && live.transcript.length > (call?.transcript.length ?? 0) ? live.transcript : (call?.transcript ?? [])
@@ -80,7 +83,7 @@ export default function AskCall({ box, embedded = false, onPrompt }: { box: BoxD
 
   const shell = embedded ? '' : 'rounded-xl border-2 border-sky-300 bg-white p-4 shadow-sm'
   return (
-    <section className={shell} aria-label="Call the trucker">
+    <section className={shell} aria-label="Call the trucker" data-demo="ask-call">
       <div className="flex flex-wrap items-center gap-3">
         {!embedded && (
           <h3 className="flex items-center gap-2 text-lg font-bold">
@@ -88,14 +91,15 @@ export default function AskCall({ box, embedded = false, onPrompt }: { box: BoxD
             Call the trucker
           </h3>
         )}
-        <span className={`rounded-md px-2 py-0.5 font-semibold ${box.ask.mode === 'mock' ? 'bg-amber-100 text-amber-950' : 'bg-emerald-100 text-emerald-900'}`}>
-          {box.ask.mode === 'mock' ? 'Simulated call' : box.ask.mode === 'phone' ? 'Retell phone call' : 'Retell web call'}
+        <span className={`rounded-md px-2 py-0.5 font-semibold ${simulated ? 'bg-amber-100 text-amber-950' : 'bg-emerald-100 text-emerald-900'}`}>
+          {simulated ? 'Simulated call' : box.ask.mode === 'phone' ? 'Retell phone call' : 'Retell web call'}
         </span>
-        <span className="text-slate-700">{MODE_TEXT[box.ask.mode]}</span>
+        <span className="text-slate-700">{box.ask.mode !== 'mock' && call?.mock ? SIMULATED_ON_REQUEST : MODE_TEXT[box.ask.mode]}</span>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <Button
           size="lg"
+          data-demo="call-button"
           className="bg-sky-700 text-white hover:bg-sky-800"
           disabled={!box.ask.available || active || start.isPending || liveOn}
           onClick={ask}
@@ -158,7 +162,7 @@ export default function AskCall({ box, embedded = false, onPrompt }: { box: BoxD
               ))}
             </ol>
           </div>
-          <div aria-label="Call outcome">
+          <div aria-label="Call outcome" data-demo="call-outcome">
             {call.outcome ? (
               <div className={`rounded-lg border-l-8 p-3 ${OUTCOME_TONE[call.outcome]}`}>
                 <div className="font-semibold">What the trucker said</div>

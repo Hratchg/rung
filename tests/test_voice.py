@@ -190,6 +190,23 @@ def test_live_web_call_uses_create_web_call_with_string_variables(client, monkey
     assert "C1" not in [c["code"] for c in box["conflicts"]]
 
 
+def test_simulate_plays_the_scripted_call_even_with_retell_keys(client, monkeypatch):
+    fake = FakeRetell()
+    settings = VoiceSettings(api_key="key_test", agent_id="agent_test", public_key="pub_test")
+    monkeypatch.setattr(main, "voice", Voice(settings, client=fake, mock=MockCalls(client.clock)))
+    heavy = box_with("heavy")
+    r = client.post(f"/api/call/{heavy}", json={"mock_outcome": "confirmed_loaded", "simulate": True}).json()
+    assert r["mode"] == "web" and r["mock"] is True and r["call_id"].startswith("mock_call_")
+    assert fake.call.web == [] and fake.call.phone == []
+
+    finish_mock_call(client)
+    done = client.get(f"/api/box/{heavy}").json()
+    assert done["call"]["outcome"] == "confirmed_loaded" and len(done["call"]["transcript"]) == 6
+    assert done["decision"]["step"] == "HAND" and "R12" in [f["id"] for f in done["fired"]]
+    started = next(h for h in done["history"] if h.get("action") == "call")
+    assert "Simulated on request" in started["effect"]
+
+
 def test_phone_call_only_when_number_and_flag_are_set(client, monkeypatch):
     heavy = box_with("heavy")
     fake = FakeRetell()

@@ -206,11 +206,15 @@ class Voice:
     def status(self) -> dict:
         return {"mode": self.mode, "missing": self.settings.missing(), "phone_enabled": self.settings.phone_enabled}
 
-    def start(self, variables: dict[str, str], metadata: dict, to_number: str | None, mock_outcome: str) -> dict:
+    def start(
+        self, variables: dict[str, str], metadata: dict, to_number: str | None, mock_outcome: str, simulate: bool = False
+    ) -> dict:
+        """simulate plays the scripted call even with Retell keys loaded, so a recorded demo is the same every time."""
         mode = self.mode
-        if mode == "mock":
+        if mode == "mock" or simulate:
             made = self.mock.create(variables, metadata, mock_outcome)
-            return {**made, "mode": "web", "mock": True}
+            note = "Simulated, no Retell key." if mode == "mock" else "Simulated on request, Retell not called."
+            return {**made, "mode": "web", "mock": True, "note": note}
         if mode == "phone":
             if not to_number:
                 raise ValueError("The appointment has no trucker phone number.")
