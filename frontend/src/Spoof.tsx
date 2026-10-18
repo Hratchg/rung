@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { SOURCE_NAMES, useSpoof, type BoxDetail, type SpoofHoldName, type SpoofResult } from './api'
 import { SOURCE_TITLE, sayTime } from './format'
+import { fromDisplayWeight, toDisplayWeight, weightUnit } from './region'
 import { StepChip } from './ui'
 
 const MAX_LB = 150_000
@@ -40,15 +41,17 @@ export default function SpoofForm({ box }: { box: BoxDetail }) {
   const [weight, setWeight] = useState('')
   const [hold, setHold] = useState<SpoofHoldName>(info.holds[0]?.name ?? 'customs')
   const active = info.holds.find((h) => h.name === hold)?.active ?? false
+  const unit = weightUnit()
+  const max = toDisplayWeight(MAX_LB)
   const parsed = Number(weight.replace(/[,\s]/g, ''))
   const typed = weight.trim() !== ''
-  const weightOk = typed && Number.isInteger(parsed) && parsed >= 0 && parsed <= MAX_LB
+  const weightOk = typed && Number.isInteger(parsed) && parsed >= 0 && parsed <= max
   const busy = spoof.isPending || !info.available
   const spoofed = Object.entries(info.spoofed)
 
   function sendWeight(e: FormEvent) {
     e.preventDefault()
-    if (weightOk) spoof.mutate({ weight_in_lbs: parsed }, { onSuccess: () => setWeight('') })
+    if (weightOk) spoof.mutate({ weight_in_lbs: Math.min(MAX_LB, fromDisplayWeight(parsed)) }, { onSuccess: () => setWeight('') })
   }
 
   const field = 'h-10 rounded-lg border border-slate-400 bg-white px-2 text-base'
@@ -62,13 +65,13 @@ export default function SpoofForm({ box }: { box: BoxDetail }) {
         <div className="mt-2 flex flex-wrap items-end gap-x-6 gap-y-3">
           <form onSubmit={sendWeight} className="flex flex-wrap items-end gap-2">
             <label className="flex flex-col">
-              <span className="text-slate-700">Carrier weight in lb</span>
+              <span className="text-slate-700">Carrier weight in {unit}</span>
               <input
                 inputMode="numeric"
                 className={`${field} w-44 tabular-nums`}
                 value={weight}
                 onChange={(e) => setWeight(e.target.value)}
-                placeholder={info.weight_in_lbs != null ? `Now ${info.weight_in_lbs.toLocaleString('en-US')}` : 'Not set'}
+                placeholder={info.weight_in_lbs != null ? `Now ${toDisplayWeight(info.weight_in_lbs).toLocaleString('en-US')}` : 'Not set'}
                 aria-invalid={typed && !weightOk}
               />
             </label>
@@ -99,7 +102,11 @@ export default function SpoofForm({ box }: { box: BoxDetail }) {
           )}
         </div>
       )}
-      {typed && !weightOk && <p className="mt-2 text-red-800">Type a whole number of pounds from 0 to 150,000.</p>}
+      {typed && !weightOk && (
+        <p className="mt-2 text-red-800">
+          Type a whole number of {unit === 'kg' ? 'kilograms' : 'pounds'} from 0 to {max.toLocaleString('en-US')}.
+        </p>
+      )}
       {spoof.error && <p className="mt-2 rounded bg-red-100 px-3 py-2 text-red-900">{spoof.error.message}</p>}
       {spoof.data && <ResultLine result={spoof.data} />}
     </div>
