@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from backend import main
 from backend.audit import twist_log
 from backend.engine import classify_silence, evaluate
-from backend.gitdiff import TwistDiffs
+from backend.gitdiff import TwistDiffs, tag_of
 from backend.main import app, scenario
 from backend.models import Box
 from backend.t49 import Poller
@@ -368,6 +368,36 @@ def test_twist_diff_reads_twist_commits_and_git_tags(tmp_path):
     assert rows["twist-1"]["status"] == "received" and rows["twist-1"]["git"] == {"available": True, "commits": []}
     lean = {r["tag"]: r for r in twist_log(scripted, [], None, commits, patches=False)}
     assert "patch" not in lean["twist-9"]["git"]["commits"][0]
+
+
+def test_twist_diff_takes_the_tag_from_merge_commit_subjects(tmp_path):
+    git(tmp_path, "init", "-q")
+    subjects = [
+        "twist: twist-1-funding",
+        "twist: twist-2-global",
+        "twist: twist-2-global",
+        "twist: twist-3-poster",
+        "twist: twist-1-funding, a federal funding pathway for Rung (#6)",
+        "twist: twist-3-poster, a 24 x 36 inch Demo Day poster (#8)",
+    ]
+    for i, subject in enumerate(subjects):
+        (tmp_path / f"f{i}.txt").write_text(f"{i}\n")
+        git(tmp_path, "add", ".")
+        git(tmp_path, "commit", "-q", "-m", subject)
+
+    commits = TwistDiffs(tmp_path).commits()
+    assert set(commits) == {"twist-1-funding", "twist-2-global", "twist-3-poster"}
+    assert [c["subject"] for c in commits["twist-1-funding"]] == [subjects[0], subjects[4]]
+    assert len(commits["twist-2-global"]) == 2 and len(commits["twist-3-poster"]) == 2
+    rows = twist_log([], [], None, commits)
+    assert sorted(r["tag"] for r in rows) == ["twist-1-funding", "twist-2-global", "twist-3-poster"]
+
+
+def test_twist_tag_is_the_first_word_without_trailing_punctuation():
+    assert tag_of("twist: twist-4") == "twist-4"
+    assert tag_of("twist: twist-4.") == "twist-4"
+    assert tag_of("twist:twist-4: a title") == "twist-4"
+    assert tag_of("twist:   ") == ""
 
 
 def test_twist_diff_without_git(tmp_path):
