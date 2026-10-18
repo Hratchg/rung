@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Rung poster</title>
+<link rel="stylesheet" href="poster.css">
+</head>
+<body>
+<main class="poster">
+
+  <header class="hero">
+    <p class="kicker">Gate triage for container terminals</p>
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 100 140" aria-hidden="true">
+        <rect x="6" y="0" width="12" height="140" rx="4" fill="#facc15"/>
+        <rect x="82" y="0" width="12" height="140" rx="4" fill="#facc15"/>
+        <rect x="18" y="12" width="64" height="12" fill="#ef4444"/>
+        <rect x="18" y="38" width="64" height="12" fill="#f59e0b"/>
+        <rect x="18" y="64" width="64" height="12" fill="#38bdf8"/>
+        <rect x="18" y="90" width="64" height="12" fill="#cbd5e1"/>
+        <rect x="18" y="116" width="64" height="12" fill="#34d399"/>
+      </svg>
+      <h1>Rung</h1>
+    </div>
+    <p class="tagline">Keep the gate open when the data goes bad.</p>
+    <div class="qr-row">
+      <figure class="qr">
+        <img src="qr-repo.svg" alt="QR code to the Rung repository">
+        <figcaption><strong>Code</strong><span>github.com/Hratchg/rung</span></figcaption>
+      </figure>
+      <figure class="qr">
+        <img src="qr-video.svg" alt="QR code to the demo video">
+        <figcaption><strong>Demo video</strong><span>Release v1.1</span></figcaption>
+      </figure>
+    </div>
+  </header>
+
+  <section class="problem">
+    <div class="problem-text">
+      <h2>The problem</h2>
+      <p class="lead">Every truck leaving a container terminal goes through the gate. Five systems describe each box, and they disagree all the time.</p>
+      <p class="lead punch">On a bad night the safe move is to close the gate, and every truck in line pays for it.</p>
+    </div>
+    <ul class="stats">
+      <li><b>191</b><span>boxes waiting to leave Pier 7 tonight</span></li>
+      <li><b>129</b><span>trucks booked through 6 gate lanes</span></li>
+    </ul>
+  </section>
+
+  <section class="how">
+    <h2>How it works</h2>
+    <ol class="flow">
+      <li class="stage">
+        <span class="num">1</span>
+        <h3>Five sources</h3>
+        <ul class="chips">
+          <li>Carrier</li><li>Terminal</li><li>Customs</li><li>Weighbridge</li><li>Reefer</li>
+        </ul>
+        <p>Read for every box, each field badged live or simulated.</p>
+      </li>
+      <li class="arrow" aria-hidden="true"><svg viewBox="0 0 40 80"><path d="M6 6 L34 40 L6 74" fill="none" stroke="#1e1b4b" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></li>
+      <li class="stage">
+        <span class="num">2</span>
+        <h3>Trust and conflicts</h3>
+        <p>Trust fades as a reading ages and drops 30 percent for each conflict.</p>
+        <ul class="chips conflicts">
+          <li>Weight</li><li>Records</li><li>Reefer</li><li>Dark feed</li><li>Clock</li>
+        </ul>
+      </li>
+      <li class="arrow" aria-hidden="true"><svg viewBox="0 0 40 80"><path d="M6 6 L34 40 L6 74" fill="none" stroke="#1e1b4b" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></li>
+      <li class="stage ladder-stage">
+        <span class="num">3</span>
+        <h3>The five step ladder</h3>
+        <div class="ladder">
+          <ol class="rungs">
+            <li class="s-hold"><b>Hold</b><span>Waits for owner</span></li>
+            <li class="s-slow"><b>Slow</b><span>New slot</span></li>
+            <li class="s-ask"><b>Ask</b><span>Fresher facts</span></li>
+            <li class="s-watch"><b>Watch</b><span>Recheck</span></li>
+            <li class="s-release"><b>Release</b><span>Cleared</span></li>
+          </ol>
+          <div class="hand"><b>Hand</b><span>A person decides</span></div>
+        </div>
+        <p>15 small rules vote. The gentlest safe step wins.</p>
+      </li>
+      <li class="arrow" aria-hidden="true"><svg viewBox="0 0 40 80"><path d="M6 6 L34 40 L6 74" fill="none" stroke="#1e1b4b" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg></li>
+      <li class="stage">
+        <span class="num">4</span>
+        <h3>The planner approves</h3>
+        <img class="shot" src="images/harbor-hold-card.png" alt="Box card recommending Hold with a Confirm hold button">
+        <p>Every hold and hard release waits for one tap, and lands in the audit log with its reason.</p>
+      </li>
+    </ol>
+  </section>
+
+  <section class="dual">
+    <h2>Dual use: one app, two nights</h2>
+    <div class="nights">
+      <article class="night tuesday">
+        <h3>An ordinary Tuesday</h3>
+        <div class="night-body">
+          <img class="shot" src="images/tuesday-queue.png" alt="Rung queue on an ordinary Tuesday">
+          <ul>
+            <li>A dispatcher's pull list: 34 of 191 boxes need a decision.</li>
+            <li>The voice agent calls truckers about weight mismatches.</li>
+          </ul>
+        </div>
+      </article>
+      <article class="night harbor">
+        <h3>Harbor Night</h3>
+        <div class="night-body">
+          <img class="shot" src="images/harbor-gate.png" alt="Rung gate plan on Harbor Night with lanes 4 to 6 closed">
+          <ul>
+            <li>Half the lanes close, a customs hold lands, a beef reefer warms, the feed goes dark.</li>
+            <li>Rung re-plans every truck in under 1 ms.</li>
+          </ul>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section class="results">
+    <div class="results-head">
+      <h2>Harbor Night results</h2>
+      <p>Lanes 4 to 6 down, feed dark. Rung against closing the terminal.</p>
+    </div>
+    <ul class="tiles">
+      <li class="tile lead-tile">
+        <b>96<small>of 129</small></b>
+        <span>trucks kept moving</span>
+        <em>0 if the terminal closes</em>
+      </li>
+      <li class="tile">
+        <b>20<small>of 20</small></b>
+        <span>reefers kept</span>
+        <em>0 if the terminal closes</em>
+      </li>
+      <li class="tile">
+        <b>28<small>of 28</small></b>
+        <span>last free day boxes kept</span>
+        <em>0 if the terminal closes</em>
+      </li>
+      <li class="tile">
+        <b><small class="pre">about</small>750<small>kg</small></b>
+        <span>truck idle CO2 avoided</span>
+        <em>92 idle hours, modelled</em>
+      </li>
+    </ul>
+  </section>
+
+  <section class="voice">
+    <div class="voice-text">
+      <h2>The Retell voice agent</h2>
+      <p class="lead">Manifest 36,000 lb, scale 40,500 lb. Rung asks.</p>
+      <ol class="steps">
+        <li>Pier 7 gate desk, a Retell voice agent, calls the trucker.</li>
+        <li>The trucker backs the scale, one of four fixed outcomes.</li>
+        <li>The box moves to <span class="pill s-hand">Hand</span> and the planner decides.</li>
+      </ol>
+      <p class="aside">The model runs the call. Rung's rules decide what happens next.</p>
+    </div>
+    <figure class="voice-shot">
+      <img class="shot" src="images/live-retell-call.png" alt="Transcript of a live Retell web call">
+      <figcaption>A real Retell web call, with its call id in the audit log.</figcaption>
+    </figure>
+  </section>
+
+  <section class="twists">
+    <article class="twist global">
+      <h2>Go global</h2>
+      <p><b>Global by design.</b> The decision core never changes: one ladder, one trust model, one gate optimizer, and a person approves every hold. A region profile swaps the edges:</p>
+      <table class="regions">
+        <thead>
+          <tr><th></th><th>Los Angeles</th><th>Rotterdam</th><th>Shanghai</th></tr>
+        </thead>
+        <tbody>
+          <tr><th>Data</th><td>Terminal49</td><td>Portbase</td><td>China Single Window</td></tr>
+          <tr><th>Units</th><td>lb, USD</td><td>kg, EUR</td><td>kg, CNY</td></tr>
+          <tr><th>Customs</th><td>CBP</td><td>Douane</td><td>China Customs</td></tr>
+        </tbody>
+      </table>
+      <p class="close">Lagos, where trucks queue for days, needs it most.</p>
+    </article>
+    <article class="twist funding">
+      <h2>Federal funding pathway</h2>
+      <dl class="path">
+        <div class="primary">
+          <dt>Launch<span>Primary</span></dt>
+          <dd><b>NSF SBIR Phase I</b>, America's Seed Fund (NSF 26-510). Up to $305K over 6 to 18 months to prove Rung on live San Pedro Bay terminal data.</dd>
+        </div>
+        <div>
+          <dt>Harden<span>Alternative</span></dt>
+          <dd><b>DoD SBIR</b> with USTRANSCOM and SDDC for strategic seaports such as Long Beach.</dd>
+        </div>
+        <div>
+          <dt>Scale<span>Alternative</span></dt>
+          <dd>Port-led <b>MARAD PIDP</b> grants.</dd>
+        </div>
+      </dl>
+      <p class="close">One tool for ordinary Tuesdays and Harbor Nights.</p>
+    </article>
+  </section>
+
+  <footer class="foot">
+    <p class="team">Team: Hratch Ghanime</p>
+    <p class="built">Pier 7 is simulated with a fixed seed. The voice call is real.<br>CO2 is modelled at 8.14 kg per truck idle hour (DOE and Argonne, EPA).<br>Built with FastAPI, scipy, React, Retell AI, and Terminal49.</p>
+  </footer>
+
+</main>
+</body>
+</html>
