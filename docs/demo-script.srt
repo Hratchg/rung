@@ -1,0 +1,187 @@
+1
+00:00:00,000 --> 00:00:03,333
+Every truck leaving a container terminal passes a gate.
+
+2
+00:00:03,333 --> 00:00:06,667
+Five systems describe each box, and they often disagree.
+
+3
+00:00:06,667 --> 00:00:09,259
+On a bad night the gate closes,
+
+4
+00:00:09,259 --> 00:00:13,704
+and every truck in line pays in delay, fees, and idling diesel.
+
+5
+00:00:15,000 --> 00:00:19,815
+This is Rung at Pier 7, on an ordinary Tuesday. 191 boxes wait.
+
+6
+00:00:19,815 --> 00:00:26,111
+Rung reads five sources per box and puts each on the gentlest safe step of this ladder,
+
+7
+00:00:26,111 --> 00:00:29,074
+from Release to Hand, where a person decides.
+
+8
+00:00:29,074 --> 00:00:30,556
+34 need a planner.
+
+9
+00:00:31,000 --> 00:00:32,852
+This box needs an answer.
+
+10
+00:00:32,852 --> 00:00:34,704
+The manifest says 36,000 pounds.
+
+11
+00:00:34,704 --> 00:00:37,667
+The scale says 40,500, a 12.5 percent gap.
+
+12
+00:00:37,667 --> 00:00:39,889
+Rung does not guess. It asks.
+
+13
+00:00:43,000 --> 00:00:46,704
+Its voice agent, built on Retell AI, calls the trucker.
+
+14
+00:00:46,704 --> 00:00:50,037
+This video plays the simulated version of that call,
+
+15
+00:00:50,037 --> 00:00:52,630
+so it runs the same every time.
+
+16
+00:00:52,630 --> 00:00:54,481
+The trucker backs the scale.
+
+17
+00:00:54,481 --> 00:00:57,074
+Rung still will not pick a side.
+
+18
+00:00:57,074 --> 00:01:00,407
+The box goes to Hand, and a planner decides.
+
+19
+00:01:02,000 --> 00:01:04,963
+This is the exact prompt that agent runs,
+
+20
+00:01:04,963 --> 00:01:08,667
+read from the setup script that creates it in Retell.
+
+21
+00:01:08,667 --> 00:01:13,481
+Who it is, how to say a container number, the weight check steps,
+
+22
+00:01:13,481 --> 00:01:16,444
+and the only four outcomes it may record.
+
+23
+00:01:16,444 --> 00:01:18,296
+The model runs the conversation.
+
+24
+00:01:18,296 --> 00:01:20,519
+Rung's rules decide what happens next.
+
+25
+00:01:23,000 --> 00:01:26,333
+Now the worst night of the year, Harbor Night.
+
+26
+00:01:26,333 --> 00:01:28,185
+Lanes 4 to 6 close.
+
+27
+00:01:28,185 --> 00:01:33,370
+Rung re-plans every truck in under a millisecond and keeps 96 of 129 moving.
+
+28
+00:01:33,370 --> 00:01:35,593
+Closing the terminal would keep none.
+
+29
+00:01:35,593 --> 00:01:38,926
+Customs drops a new hold on a dry box.
+
+30
+00:01:38,926 --> 00:01:41,148
+Then the terminal feed goes dark.
+
+31
+00:01:41,148 --> 00:01:47,074
+By our model, Rung saves about 90 idle truck hours and over 700 kilograms of CO2.
+
+32
+00:01:50,000 --> 00:01:52,963
+The queue now lists what went wrong tonight.
+
+33
+00:01:52,963 --> 00:01:58,148
+With the feed dark, Rung does not hand a hundred boxes to a person.
+
+34
+00:01:58,148 --> 00:02:01,481
+Only the 21 trucks due now go to Hand.
+
+35
+00:02:03,000 --> 00:02:05,593
+This box cannot wait, and cannot go.
+
+36
+00:02:05,593 --> 00:02:09,667
+Chilled beef, power off since nine, already past its loss limit,
+
+37
+00:02:09,667 --> 00:02:11,148
+under a customs hold.
+
+38
+00:02:11,148 --> 00:02:13,741
+Releasing it is not ours to give.
+
+39
+00:02:13,741 --> 00:02:18,185
+Rung says Hold, names the customs broker, and attaches the reefer evidence.
+
+40
+00:02:20,000 --> 00:02:23,704
+Every step, call, and override lands in the audit log,
+
+41
+00:02:23,704 --> 00:02:25,926
+with its reason in plain words.
+
+42
+00:02:27,000 --> 00:02:29,593
+Rung is not tied to one port.
+
+43
+00:02:29,593 --> 00:02:34,778
+Switch to Rotterdam and the same engine speaks kilograms, euros, Dutch customs, and Portbase.
+
+44
+00:02:34,778 --> 00:02:36,259
+Same rules, same decisions.
+
+45
+00:02:37,000 --> 00:02:38,481
+Rules decide. People sign.
+
+46
+00:02:38,481 --> 00:02:43,296
+Rung, built with Retell AI, the Terminal49 data model, FastAPI, React, and SciPy.
+
+47
+00:02:43,296 --> 00:02:45,148
+Next, NSF SBIR Phase One.

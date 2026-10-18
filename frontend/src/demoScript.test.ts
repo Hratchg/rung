@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import scriptMarkdown from '../../docs/demo-script.md?raw'
+import scriptSubtitles from '../../docs/demo-script.srt?raw'
+import { demoMarkdown, demoSubtitles } from './demoDocs'
 import { DEMO_CHAPTERS, DEMO_TOTAL, WEIGHT_BOX, WORDS_PER_SECOND, chapterEnd, clock, wordCount } from './demoScript'
 
 const tsx = import.meta.glob('./**/*.tsx', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
@@ -53,5 +56,19 @@ describe('demo timeline', () => {
 
   it('formats script timestamps', () => {
     expect([clock(0), clock(62), clock(166)]).toEqual(['0:00', '1:02', '2:46'])
+  })
+})
+
+describe('demo script docs', () => {
+  it('match the timeline. Run npm run demo-script after changing it', () => {
+    expect(scriptMarkdown).toBe(demoMarkdown())
+    expect(scriptSubtitles).toBe(demoSubtitles())
+  })
+
+  it('give the Retell prompt timestamp and keep every subtitle inside the demo', () => {
+    expect(scriptMarkdown).toContain('At 1:02 the Voice agent prompt drawer')
+    const ends = [...scriptSubtitles.matchAll(/--> (\d\d):(\d\d):(\d\d),(\d{3})/g)].map((m) => +m[1] * 3600 + +m[2] * 60 + +m[3] + +m[4] / 1000)
+    expect(ends.length).toBeGreaterThan(DEMO_CHAPTERS.length)
+    expect(Math.max(...ends)).toBeLessThan(DEMO_TOTAL)
   })
 })
