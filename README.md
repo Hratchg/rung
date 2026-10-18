@@ -27,7 +27,7 @@ hands the planner only the boxes that need a person.
 - [Rung, global](docs/global.md): what stays the same in every port, what changes in Rotterdam, Shanghai, Singapore, and Lagos, and the region switch in the header.
 - [How Rung works](docs/how-it-works.md): architecture, trust, conflicts, urgency, the rules, the optimizer, the voice call, and what is live versus simulated.
 - [Demo script](docs/demo-script.md): the narration for demo mode, timed to the second, with two ways to add your voice and a rules checklist for the video.
-- [Demo pitch](docs/demo-pitch.md): a pitch that fits in 2:50 with the live voice call, a click by click run of show, a 30 second version, and a judges Q&A sheet.
+- [Demo pitch](docs/demo-pitch.md): a pitch that fits in 2:51 with the live voice call and all three hackathon twists, a click by click run of show, a 30 second version, and a judges Q&A sheet.
 - [Funding pathway](docs/funding-pathway.md): the federal funding plan, with sources. An NSF SBIR Phase I grant to launch, DoD through USTRANSCOM and SDDC for the Harbor Night dual use, and port-led MARAD grants to roll out.
 - [Demo Day poster](docs/poster/): the 24 by 36 inch poster, its HTML and CSS source, and the print file `rung-poster.pdf`.
 
