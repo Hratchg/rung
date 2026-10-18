@@ -26,6 +26,7 @@ hands the planner only the boxes that need a person.
 - [UI guide](docs/ui-guide.md): a 60 second tour, every screen with annotated screenshots, a plain language glossary of every term on screen, and common questions. Start here if you have no port or logistics background.
 - [Rung, global](docs/global.md): what stays the same in every port, what changes in Rotterdam, Shanghai, Singapore, and Lagos, and the region switch in the header.
 - [How Rung works](docs/how-it-works.md): architecture, trust, conflicts, urgency, the rules, the optimizer, the voice call, and what is live versus simulated.
+- [Demo script](docs/demo-script.md): the narration for demo mode, timed to the second, with two ways to add your voice and a rules checklist for the video.
 - [Demo pitch](docs/demo-pitch.md): a pitch that fits in 2:50 with the live voice call, a click by click run of show, a 30 second version, and a judges Q&A sheet.
 - [Funding pathway](docs/funding-pathway.md): the federal funding plan, with sources. An NSF SBIR Phase I grant to launch, DoD through USTRANSCOM and SDDC for the Harbor Night dual use, and port-led MARAD grants to roll out.
 - [Demo Day poster](docs/poster/): the 24 by 36 inch poster, its HTML and CSS source, and the print file `rung-poster.pdf`.
@@ -48,11 +49,24 @@ picks another port, and `HOST=0.0.0.0 make demo` listens on every interface.
 No keys and no network are needed. With an empty `.env`, every box is simulated, **Call the trucker**
 plays a scripted simulated call, and the scenario runs the same way every time.
 
+### Demo mode
+
+Press **Play demo** in the Demo controls dock, or open http://127.0.0.1:8000/?demo=1. Rung resets the
+night, pauses the clock, and plays a 2:46 tour on its own, with a spotlight and a lower third for each
+chapter: Everyday mode, a weight conflict, the trucker call, the Retell AI prompt at 1:02, Crisis mode,
+the 21 Hand boxes, the reefer that cannot go, the audit log, and Rotterdam. **Esc** stops it. The call
+in demo mode is always the simulated one, even with Retell keys loaded, so every take is the same.
+
+The narration to read along with, and two ways to record your voice over it, are in the
+[demo script](docs/demo-script.md). The timeline lives in `frontend/src/demoScript.ts`, and
+`npm run demo-script` in `frontend` writes the script and its subtitles from it.
+
 | Command | What it does |
 | --- | --- |
 | `make demo` | Install if needed, build, and serve on one port |
 | `make test` | Run the pytest suite |
-| `cd frontend && npm test` | Run the Vitest suite: the UI copy rules, the ladder helpers, and the prompt drawer parser |
+| `cd frontend && npm test` | Run the Vitest suite: the UI copy rules, the ladder helpers, the prompt drawer parser, and the demo timeline |
+| `cd frontend && npm run demo-script` | Write `docs/demo-script.md` and `docs/demo-script.srt` from the demo timeline |
 | `make dev` | Hot reload: uvicorn on port 8000 plus the Vite dev server, with `/api` proxied to port 8000 |
 | `make setup` | Install only |
 | `make build` | Build the frontend into `frontend/dist` |
@@ -121,11 +135,12 @@ browser, and its chip reads **Retell web call**. Allow the microphone, and answe
 | Rated orders | Dock, **More controls** | Six listed boxes get a 03:00 gate out deadline, plus 50 urgency, and first claim on the gate. Boxes that slid show under **No slot tonight** |
 | Silent reefer classifier | Dock, **More controls**, **Reefer fault** | Cut power, trip a circuit, drop telemetry, or fail a unit. Rung tells a tripped circuit from a failed unit from a telemetry fault |
 | Twist log | Dock, **More controls**, **Twist log** | Each twist tag, what it added, when it merged, and the git diff of its commits |
+| Demo mode | Dock, **Play demo**, or `?demo=1` | A 2:46 tour that plays on its own for the demo video, with a spotlight, a lower third per chapter, and a title and closing card. **Esc** stops it |
 
 The dashed amber **Demo controls** dock at the bottom drives the scenario and is not part of the
 planner's app: **Everyday** (start over at 22:00 on Tuesday), **Crisis** (jump to 22:44 on Harbor
 Night, after the scripted crisis events), **Speed** in scenario minutes per second (Pause stops the
-clock), **Voice agent prompt**, and **More controls** with Close lanes 4 to 6, Customs hold on TCLU7654321, Cut terminal feed, the reefer
+clock), **Play demo** (the narrated tour above), **Voice agent prompt**, and **More controls** with Close lanes 4 to 6, Customs hold on TCLU7654321, Cut terminal feed, the reefer
 faults, and rated orders. The scripted Harbor Night events fire on their own as the clock passes them.
 See [How Rung works](docs/how-it-works.md#the-scenario) for the timeline and the matching API calls,
 and the [UI guide](docs/ui-guide.md) for an annotated tour of every screen and a glossary of every term.
@@ -146,6 +161,8 @@ and the [UI guide](docs/ui-guide.md) for an annotated tour of every screen and a
 | `backend/main.py` | FastAPI routes. Serves `frontend/dist` from the same origin |
 | `frontend/src/` | Vite, React, TypeScript, Tailwind, TanStack Query, shadcn/ui primitives on Radix in `components/ui` |
 | `frontend/src/copy.ts` | Every plain language label: step meanings, rule tags, planner verbs, event lines |
+| `frontend/src/demoScript.ts`, `DemoPlayer.tsx` | The demo mode timeline as data, and the player that runs it |
+| `frontend/scripts/demo-script.ts` | Writes the demo script and its subtitles from the timeline |
 | `scripts/` | `retell_setup.py`, `tunnel.py`, `track.py`, `envfile.py` |
 | `scenario.json`, `fixtures/`, `twists.json` | The scenario, the Terminal49 fixture, and the twist log |
 | `tests/` | Engine, API, gate, voice, live setup, and Phase 5 tests |

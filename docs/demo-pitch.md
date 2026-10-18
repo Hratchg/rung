@@ -5,6 +5,11 @@ A pitch that fits in 2:50 with the live voice call, a click by click run of show
 screen. Planner controls sit in the app itself. Everything that drives the scenario sits in the
 dashed amber **Demo controls** dock at the bottom of the screen.
 
+This page is for presenting live. For the recorded demo video, use demo mode instead: **Play demo** in
+the dock, or http://127.0.0.1:8000/?demo=1, plays the whole story on its own in 2:46, with the Retell AI
+prompt at 1:02. The [demo script](demo-script.md) has the narration timed to it, two ways to add your
+voice, and a rules checklist.
+
 ## Before you go on
 
 1. Start the app with `make demo`. For the live call, set it up beforehand: `make tunnel` in a second terminal, `make retell-setup` once, then restart `make demo`. The steps are in the [README](../README.md#a-live-retell-call).
@@ -152,14 +157,15 @@ top.
 ## The 30 second version
 
 Set up first: press **Pause**, then **Crisis** in the dock, and open the **Gate plan** tab. The clock
-jumps to 22:44 on Harbor Night with every scripted crisis event fired, and stays paused.
+jumps to 22:44 on Harbor Night with every scripted crisis event fired, and stays paused. On the
+fourth sentence, click the **Queue** tab. The **Hand** step in the ladder reads 21.
 
 > Container terminals close the gate when their data goes bad, and every truck in line pays for it.
 > Rung reads five sources for every box, trusts each one as much as it has earned, and picks the
 > gentlest safe step, from Release to Hand. Tonight half our lanes are down and the terminal feed is
-> dark, and Rung still keeps 96 of 129 trucks moving, every reefer included. When the paperwork and
-> the scale disagree, it calls the trucker with a voice agent and writes the answer into an audit
-> log. The planner signs every hard call.
+> dark, and Rung still keeps 96 of 129 trucks moving. Only the 21 trucks due now go to a person. When
+> the paperwork and the scale disagree, it calls the trucker with a voice agent and writes the answer
+> into an audit log. The planner signs every hard call.
 
 ## Judges Q&A
 

@@ -20,7 +20,7 @@ Contents
    - [Voice agent prompt drawer](#voice-agent-prompt-drawer)
    - [Gate plan](#gate-plan)
    - [Audit log](#audit-log)
-   - [Demo dock](#demo-dock)
+   - [Demo dock](#demo-dock) and [demo mode](#demo-mode)
 3. [Glossary](#3-glossary)
 4. [Common questions](#4-common-questions)
 
@@ -49,7 +49,7 @@ line hold. Those belong to outside owners.
 4. **The headline.** How many boxes need your decision right now. Start here.
 5. **The ladder strip.** How many boxes sit on each step, gentlest on the left. Click a step to show only those boxes.
 6. **A queue row.** One box per row, most urgent first, with the reason in plain words and one button that says what it does. **Details** opens the rest.
-7. **Demo controls.** The dark dashed bar at the bottom drives the scripted night for the presenter. It is not part of the planner's app.
+7. **Demo controls.** The dark dashed bar at the bottom drives the scripted night for the presenter. It is not part of the planner's app. **Play demo** in it starts a narrated tour that plays on its own.
 
 Click any box number to open its **box card**, the full story for one box. Click **Gate plan** to see
 every truck placed in a lane and hour.
@@ -473,14 +473,15 @@ presenter, not the planner.
 2. **Scenario.** Time since the night started at 22:00, such as +00:44.
 3. **Night.** **Everyday** starts the night again at 22:00 on Tuesday and clears every decision, call, and spoof. **Crisis** jumps to 22:44 on Harbor Night, after every scripted crisis event has fired. The button for the current mode is highlighted. Both keep the current speed, so a paused clock stays paused.
 4. **Speed.** How fast the scenario clock runs: **Pause**, 1, 2, 5, or 10 scenario minutes for each real second.
-5. **Voice agent prompt.** Opens the prompt drawer.
-6. **More controls** or **Fewer controls.** Opens or closes the upper panel.
-7. **Note.** A reminder that these controls are not part of the planner app.
-8. **Fire an event now.** Trigger a scripted event early, or undo it.
-9. **Reefer fault.** Pick a powered reefer, pick a fault, and click **Apply**.
-10. **Rated orders.** A switch that turns rated orders on or off.
-11. **Scripted timeline.** Every scripted event with its time. A green check marks the ones that have fired.
-12. **Twist log.** Opens the twist log drawer.
+5. **Play demo.** Starts [demo mode](#demo-mode), a narrated tour of the app that plays on its own in 2 minutes 46 seconds.
+6. **Voice agent prompt.** Opens the prompt drawer.
+7. **More controls** or **Fewer controls.** Opens or closes the upper panel.
+8. **Note.** A reminder that these controls are not part of the planner app.
+9. **Fire an event now.** Trigger a scripted event early, or undo it.
+10. **Reefer fault.** Pick a powered reefer, pick a fault, and click **Apply**.
+11. **Rated orders.** A switch that turns rated orders on or off.
+12. **Scripted timeline.** Every scripted event with its time. A green check marks the ones that have fired.
+13. **Twist log.** Opens the twist log drawer.
 
 On a wide screen the bar also shows the next scripted event. On a phone it shrinks to two rows, and
 **Voice agent prompt** moves into **More controls**.
@@ -500,10 +501,28 @@ On a wide screen the bar also shows the next scripted event. On a phone it shrin
 | **Speed** | Time passing faster or not at all. Scripted events fire as the clock passes them |
 | **Demo: fake a reading** (on a box card) | A wrong carrier weight, or a hold placed or cleared, to show how Rung reacts |
 | **The simulated trucker answers** (in the call panel) | What the trucker says on a simulated call |
+| **Play demo** | Nothing at the terminal. It plays a narrated tour of the whole app for the demo video |
 
 The scripted night: Harbor Night begins at +00:05, lanes 4 to 6 close at +00:10, a customs hold lands
 on TCLU7654321 at +00:20, the reefer MSKU1234567 is logged as off at +00:25 (it has been off since
 21:00), the terminal feed goes dark at +00:40, and a placeholder twist arrives at +01:00.
+
+#### Demo mode
+
+**Play demo** in the dock, or the address http://127.0.0.1:8000/?demo=1, starts a tour that plays on
+its own for the demo video. It resets the night to Everyday mode at 22:00, pauses the clock, sets the
+region to Los Angeles, and hides the dock. Then it walks the story in nine chapters between a title
+card and a closing card: the Queue, a weight conflict, the trucker call, the Retell AI prompt, Crisis
+mode on the Gate plan, the 21 Hand boxes, the reefer that cannot go, the audit log, and Rotterdam.
+
+- **Spotlight.** An amber ring around the part of the screen the narration talks about. The rest of the screen dims.
+- **Lower third.** The dark card at the bottom: the chapter number, its title, one line about it, and **Esc stops the demo**.
+- **Progress bar.** A thin amber line along the bottom edge.
+
+The call in demo mode is always the simulated one, even when Retell keys are loaded, and the call
+panel says so. Press **Esc** at any time to stop. The closing card stays up until you press **Esc** or
+**Close**. Stopping brings the dock back and sets the region to Los Angeles. The narration, timed to the
+second, is in the [demo script](demo-script.md).
 
 ## 3. Glossary
 
@@ -553,6 +572,7 @@ Every term a viewer can meet on screen, in alphabetical order. The C and R codes
 - **Details.** The button at the end of a queue row in the Simple view. Opens the urgency, booking, timing, and full reason under the row.
 - **Detailed view.** The queue view that shows urgency, the booked slot, the last free day, reefer readings, and the reason in every row. See Simple view.
 - **Demo controls, demo dock.** The dark dashed bar that drives the scripted night. Not part of the planner app.
+- **Demo mode.** A narrated tour of the app that plays on its own for the demo video. **Play demo** in the demo dock starts it, and **Esc** stops it.
 - **Demo spoof, Demo: fake a reading.** A form for judges to type a fake weight or toggle a hold. It shows in the audit log as Demo spoof.
 - **Demurrage.** A daily storage fee a box owes once its free days at the terminal run out. In this scenario it is 440 USD a day for a reefer and 275 USD for other boxes. Shown under **Fees**.
 - **Draw.** How much electric power a reefer pulls, in kW. Normal is 2 to 8 kW.
@@ -807,4 +827,8 @@ Click **Everyday** in the demo dock. The night starts again at 22:00 on Tuesday.
 
 **How do I jump straight to the crisis?**
 Click **Crisis** in the demo dock. The clock jumps to 22:44 on Harbor Night, with every scripted crisis
-event already fired.
+event already fired. The Hand step reads 21, the same as when the clock runs there minute by minute.
+
+**How do I play the demo tour?**
+Click **Play demo** in the demo dock, or open http://127.0.0.1:8000/?demo=1. The tour plays on its own
+for 2 minutes 46 seconds. Press **Esc** to stop it. See [Demo mode](#demo-mode).

@@ -35,7 +35,7 @@ label, and rule and conflict ids such as R3 or C1 stay as secondary detail behin
 - **Queue**. The headline counts the boxes that need a decision. Under it the ladder strip shows the six steps gentlest first, each with its count and a short meaning, and Hand set apart on the right. Click a step to filter. **How the ladder works** explains every step and how the votes are counted. **Simple** view, the default, shows each box with Rung's step, plain issue tags such as Weight mismatch or Hold by customs broker, and one main button named for the action. **Details** opens the urgency, booking, clocks, and full reason under the row. **Detailed** view puts all of it in every row. The choice is remembered.
 - **Box card**. The big card says what Rung recommends, the next step in one sentence, the owner, the urgency, and where the step sits on the ladder, with **Your move** on the right. In Crisis mode, a red line above it names why tonight's crisis touches this box, for example its lane is closed and a feed it needs is dark. The call panel and the reefer card follow when they matter. The evidence sits in tabs: **Why Rung says** with the rule votes next to **Where the sources disagree**, **Sources and trust**, **Call the trucker**, and **Reason and history**. The demo spoof form stays collapsed until opened.
 - **Gate plan**. In Everyday mode the summary says how many booked trucks have a slot with all lanes open, and **Compare with closing the terminal** opens the comparison. In Crisis mode the red summary leads with the comparison against closing the terminal, in trucks kept, idle hours, and kg CO2. The lanes by hour grid follows with an icon key, then **Moved to a new slot** and **No slot tonight**.
-- **Demo controls**. A dashed amber dock at the bottom holds everything that drives the scenario: **Everyday** (start over at 22:00 on Tuesday), **Crisis** (jump to 22:44 on Harbor Night, after the scripted crisis events), **Speed**, **Voice agent prompt**, and **More controls** with the event buttons, reefer faults, rated orders, the scripted timeline, and the twist log. None of it is part of the planner's app.
+- **Demo controls**. A dashed amber dock at the bottom holds everything that drives the scenario: **Everyday** (start over at 22:00 on Tuesday), **Crisis** (jump to 22:44 on Harbor Night, after the scripted crisis events), **Speed**, **Play demo** (see [Demo mode](#demo-mode)), **Voice agent prompt**, and **More controls** with the event buttons, reefer faults, rated orders, the scripted timeline, and the twist log. None of it is part of the planner's app.
 
 ## Architecture
 
@@ -73,6 +73,12 @@ The clock starts at 22:00 on Oct 18 and runs one scenario minute per real second
 **Speed** buttons in the Demo controls dock offer Pause, 1, 2, 5, and 10 scenario minutes per real
 second. **Everyday** resets to 22:00, and **Crisis** calls `POST /api/scenario/jump` with `+00:44`, so
 every scripted crisis event below has fired.
+
+A jump applies the scripted events it passes one at a time and re-evaluates every box after each one,
+the same as letting the clock run. Decisions carry state from one evaluation to the next, such as a
+release that was pending when the terminal feed went dark, so skipping that step would land on
+different steps. The jump to `+00:44` gives the same counts as minute by minute: 21 HAND, 58 SLOW,
+106 WATCH, 5 HOLD, and 1 ASK, which a test checks.
 
 The yard holds 191 boxes: the one hand written Harbor Night box `MSKU1234567` from the spec, plus 190
 synthetic boxes. The synthetic boxes have valid ISO 6346 numbers, 15 percent are reefers (frozen at
@@ -367,7 +373,10 @@ Each call writes a `voice` audit line with the call id when it starts and anothe
 and outcome when it ends.
 
 With no Retell key, the same button plays a scripted simulated call line by line, and the dashed Demo
-picker **The simulated trucker answers** sets the trucker's answer. The inbound job, a trucker calling to ask whether a box is ready,
+picker **The simulated trucker answers** sets the trucker's answer. `POST /api/call/{box}` with
+`"simulate": true` plays the same scripted call even when Retell keys are loaded. The chip then reads
+**Simulated call** and the panel says the live agent was not called. Demo mode uses it, so a recorded
+take is the same every time. The inbound job, a trucker calling to ask whether a box is ready,
 uses `lookup_box` too, but it needs a phone number bought in Retell.
 
 `make retell-setup` builds the LLM and the agent from code: the prompt for both jobs, the two custom
@@ -437,6 +446,34 @@ Three twists are merged: `twist-1-funding`, the [federal funding pathway](fundin
 [Demo Day poster](poster/). The panel lists all three, and from `+01:00` it also lists the scripted
 `twist-1` placeholder.
 
+## Demo mode
+
+**Play demo** in the dock, or `?demo=1` in the address, plays a 2:46 tour for the demo video. The
+whole tour is data in `frontend/src/demoScript.ts`: eleven chapters, each with a start time, a lower
+third, what is on screen, the narration, and timed actions. `DemoPlayer.tsx` runs the actions on the
+wall clock, one after another, so a slow request delays the next step instead of skipping it.
+
+| Action | What it does |
+| --- | --- |
+| `setup` | Pause the clock, reset the night, set the region to Los Angeles, Simple queue view, open the Queue |
+| `card` | Show the title card or the closing card, or hide them |
+| `route` | Go to a screen, such as `#/gate` or `#/box/CMAU9939083` |
+| `spot` | Move the amber spotlight to an element with that `data-demo` attribute, scrolling it into view above the lower third |
+| `click` | Click an element with that `data-demo` attribute, such as a ladder step or a tab |
+| `post` | Call the API: a scenario jump, a reset, a region, or the ask call |
+| `panel` | Open the prompt drawer or the audit log drawer, or close them |
+
+Every action talks to the same API the dock uses. The ask call posts `/api/call/CMAU9939083` with
+`"simulate": true`, so it is the scripted call even when Retell keys are loaded, and the screen says
+so. Crisis mode lands as four jumps, `+00:05`, `+00:10`, `+00:20`, and `+00:40`, so each scripted event
+shows on its own. **Esc** stops the tour at any point, puts the region back to Los Angeles, and brings
+the dock back.
+
+`npm run demo-script` in `frontend` writes [demo-script.md](demo-script.md), the narration to read
+along with, and `demo-script.srt`, the same lines as subtitles, from the timeline. A test fails when
+either file is out of date, when the tour would run past 2:55, when a chapter has more words than it
+can fit at 2.7 words a second, or when an action points at a `data-demo` attribute no component has.
+
 ## Tests
 
 `make test` runs the pytest suite: the engine cases from the spec (the Harbor Night box, a clear box,
@@ -447,4 +484,4 @@ suite blanks real keys, so it never calls an outside service.
 
 `cd frontend && npm test` runs the Vitest suite. It lints every UI string in `frontend/src` for the
 spec's copy rules (no contractions, no dashes, no semicolons in on screen text), and checks the ladder
-helpers and the prompt drawer parser.
+helpers, the prompt drawer parser, and the demo mode timeline and its script.
