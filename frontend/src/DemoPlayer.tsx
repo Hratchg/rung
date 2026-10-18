@@ -32,6 +32,19 @@ async function waitFor(target: string, alive: () => boolean): Promise<HTMLElemen
   return null
 }
 
+/** Radix focuses the first control in a drawer it opens, and selects an input's text. On a recording that reads as a stray highlight. */
+async function blurDrawer(alive: () => boolean): Promise<void> {
+  const until = performance.now() + WAIT_MS
+  while (alive() && performance.now() < until) {
+    const el = document.activeElement
+    if (el instanceof HTMLElement && el.closest('[role="dialog"]')) {
+      el.blur()
+      return
+    }
+    await new Promise((r) => setTimeout(r, 30))
+  }
+}
+
 function scrollParent(el: HTMLElement): HTMLElement | null {
   for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
     const y = getComputedStyle(p).overflowY
@@ -211,6 +224,15 @@ export default function DemoPlayer({ setPanel, onStop }: { setPanel: (p: DemoPan
   const stopRef = useRef<() => void>(() => undefined)
 
   useEffect(() => {
+    // The page still scrolls. A recording just does not show the scrollbar.
+    const root = document.documentElement
+    root.style.setProperty('scrollbar-width', 'none')
+    return () => {
+      root.style.removeProperty('scrollbar-width')
+    }
+  }, [])
+
+  useEffect(() => {
     alive.current = true
     const isAlive = () => alive.current
     const refresh = () => qc.invalidateQueries()
@@ -249,6 +271,7 @@ export default function DemoPlayer({ setPanel, onStop }: { setPanel: (p: DemoPan
           return
         case 'panel':
           setPanel(a.panel === 'audit' ? { kind: 'audit', box: a.box } : a.panel === 'prompt' ? { kind: 'prompt' } : null)
+          if (a.panel) void blurDrawer(isAlive)
           return
       }
     }
