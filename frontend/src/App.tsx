@@ -220,12 +220,12 @@ export default function App() {
         {state.isError && <p className="bg-red-100 px-4 py-2 text-red-900">Lost contact with the Rung server. Showing the last update.</p>}
         {route.name === 'box' && <BoxCard key={route.number} number={route.number} onAudit={(box) => setPanel({ kind: 'audit', box })} onPrompt={() => setPanel({ kind: 'prompt' })} />}
         {route.name === 'gate' && <GateScreen />}
-        {route.name === 'queue' && <Queue key={demo.run} state={state.data} />}
-        <AuditPanel open={panel?.kind === 'audit'} key={panel?.kind === 'audit' ? panel.box : 'audit'} initialBox={panel?.kind === 'audit' ? panel.box : ''} onClose={closePanel} />
+        {route.name === 'queue' && <Queue key={`queue-${demo.run}`} state={state.data} />}
+        <AuditPanel open={panel?.kind === 'audit'} key={panel?.kind === 'audit' ? `audit-${panel.box}` : 'audit'} initialBox={panel?.kind === 'audit' ? panel.box : ''} onClose={closePanel} />
         <TwistPanel open={panel?.kind === 'twist'} onClose={closePanel} />
         <PromptPanel open={panel?.kind === 'prompt'} onClose={closePanel} />
         {demo.on ? (
-          <DemoPlayer key={demo.run} setPanel={setPanel} onStop={demo.stop} />
+          <DemoPlayer key={`demo-${demo.run}`} setPanel={setPanel} onStop={demo.stop} />
         ) : (
           <DemoDock state={state.data} onTwist={() => setPanel({ kind: 'twist' })} onPrompt={() => setPanel({ kind: 'prompt' })} onDemo={demo.start} />
         )}
