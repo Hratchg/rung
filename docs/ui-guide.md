@@ -67,13 +67,21 @@ blue so nobody mistakes one night for the other.
 
 1. **Rung, Gate triage at Pier 7.** The product and the terminal. Click it to go back to the queue.
 2. **Night chip.** **Tuesday** (an ordinary night) or **Harbor Night** (the worst night of the year). Hover it for that one line description.
-3. **Scenario clock.** The time and date at the terminal in the scripted night. It starts at 22:00 on Oct 18 and moves at the speed set in the demo dock.
+3. **Scenario clock.** The time and date at the terminal in the scripted night, with the time zone label for the region (PDT, CEST, or CST). It starts at 22:00 on Oct 18 and moves at the speed set in the demo dock.
 4. **Lanes open.** How many of the six gate lanes take trucks now. Closed lanes are named in amber, for example "Closed 4 to 6".
 5. **Screens.** **Queue** lists every box waiting to leave. **Gate plan** shows the lane by hour plan. **Audit log** opens a side drawer with every decision.
 6. **Tonight so far.** The shift totals, explained in the next section.
 7. **Dark feed banner.** A red line that appears while a data source has stopped reporting, for example "Terminal feed dark, 4 min". Rung keeps working from the last snapshot it received. Boxes that need that feed wait, and trucks due at the gate right now go to a person. The banner also appears if the live Terminal49 connection fails.
 8. **Latest event.** The newest scripted event, with its time, such as "22:40 Terminal feed went dark". Before anything happens it reads "Nothing has happened yet tonight".
 9. **Data source chip.** Whether the numbers are live or simulated. "All data simulated" means fixture mode. Hover it for the badge legend.
+
+**Region.** A menu with a globe icon, right after "Gate triage at Pier 7", added for the second
+hackathon twist after these pictures were taken. It switches the port between **Los Angeles** (the
+default), **Rotterdam**, and **Shanghai**. The switch changes what you read: weights in lb or kg,
+money in USD, EUR, or CNY, the customs authority and hold owner names (customs broker, customs agent, or
+customs declaration agent), the data adapter named in the data source chip (Terminal49, Portbase, or
+China Single Window), the CO2 factor label, and the time zone label. It never changes a step, an
+urgency, or the gate plan. See [Rung, global](global.md) for pictures of all three.
 
 ### Tonight so far
 
@@ -84,7 +92,7 @@ The second row of the app bar. Each number has a hover with a one line explanati
 1. **Released.** Trucks that have left the gate since the shift started, each one confirmed by the planner.
 2. **Reefers powered.** Refrigerated boxes that have power, plus the ones already gone on a truck.
 3. **Reefers lost.** Reefers whose cargo has warmed past its loss limit, so the food may be spoiled. Red when above zero.
-4. **Fees avoided.** Demurrage, the daily storage fee a box owes once its free days run out, saved by releasing boxes in time. In US dollars.
+4. **Fees avoided.** Demurrage, the daily storage fee a box owes once its free days run out, saved by releasing boxes in time. In the region's currency: US dollars by default.
 5. **Bookings kept.** The share of tonight's truck bookings that still have a gate slot.
 6. **Truck idle.** Hours that booked trucks have spent idling at the gate so far tonight, and the CO2 that idling burned. Marked "modelled" because it is computed, not measured. Hover it to see the same numbers if the terminal had simply closed, plus the factor and its sources.
 
@@ -540,6 +548,7 @@ Every term a viewer can meet on screen, in alphabetical order. The C and R codes
 - **Reefer.** A refrigerated container with its own cooling unit, plugged into yard power. Its cargo might be frozen (set to minus 18 C), chilled meat (minus 1.4 C), or produce (plus 10 C).
 - **Reefer crew.** Terminal staff who plug in, watch, and fix reefers.
 - **Reefers lost, Reefers powered.** Counters: reefers whose cargo warmed past its loss limit, and reefers with power (or already gone).
+- **Region.** The port Rung is set up for, picked in the header: Los Angeles, Rotterdam, or Shanghai. It changes units, currency, and names, never a decision. In Rotterdam customs is **Douane** (Dutch Customs) and the data adapter is **Portbase**, the port community system. In Shanghai customs is **GACC** (China Customs) and the adapter is the **China Single Window**. Outside Los Angeles the adapter is a stub, so all data is simulated.
 - **Release.** Ladder step 1, the gentlest. No conflict and cleared, so the truck leaves at its slot. You confirm with one tap.
 - **Release truck.** The Release button. The truck leaves the gate now.
 - **Released, Released at.** Trucks that have left tonight, and the time one box left.

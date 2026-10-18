@@ -29,7 +29,7 @@ The UI is built to be read from across a room at 1280 by 720. Every status color
 label, and rule and conflict ids such as R3 or C1 stay as secondary detail behind plain words. The
 [UI guide](ui-guide.md) walks through every screen with annotated screenshots and explains every term.
 
-- **Header**, in three rows. The first says where you are: Rung, Gate triage at Pier 7, the night (Tuesday or Harbor Night), the scenario clock, lanes open, and the three screens, **Queue**, **Gate plan**, and **Audit log**. The second row is **Tonight so far**: Released, Reefers powered, Reefers lost, Fees avoided, Bookings kept, and Truck idle in hours and kg CO2, marked modelled. The third shows the latest scenario event on the left and where the data comes from on the right. A red banner sits above it while a feed is dark.
+- **Header**, in three rows. The first says where you are: Rung, Gate triage at Pier 7, the **Region** menu (Los Angeles, Rotterdam, or Shanghai), the night (Tuesday or Harbor Night), the scenario clock with its time zone label, lanes open, and the three screens, **Queue**, **Gate plan**, and **Audit log**. The second row is **Tonight so far**: Released, Reefers powered, Reefers lost, Fees avoided, Bookings kept, and Truck idle in hours and kg CO2, marked modelled. The third shows the latest scenario event on the left and where the data comes from on the right. A red banner sits above it while a feed is dark.
 - **Queue**. The headline counts the boxes that need a decision. Under it the ladder strip shows the six steps gentlest first, each with its count and a short meaning, and Hand set apart on the right. Click a step to filter. **How the ladder works** explains every step and how the votes are counted. Each row leads with plain words such as Weight mismatch or Hold by customs broker, and has one main button named for the action.
 - **Box card**. The big card says what Rung recommends, the next step in one sentence, the owner, the urgency, and where the step sits on the ladder, with **Your move** on the right. The call panel and the reefer card follow when they matter, then **Why Rung says** with the rule votes next to **Where the sources disagree**. Sources and trust, the full reason, the decision history, and the demo spoof form stay collapsed until opened.
 - **Gate plan**. The headline compares Rung against closing the terminal, in trucks kept, idle hours, and kg CO2. The lanes by hour grid follows with an icon key, then **Moved to a new slot** and **No slot tonight**.
@@ -317,6 +317,29 @@ back as secondary detail:
 - The Gate plan headline and its fourth card use `idle_hours_avoided`, `idle_co2_kg_avoided`, and the two `idle_co2_kg_plan` values. A footnote names the factor and links both sources. **Moved to a new slot** and **No slot tonight** add each truck's idle minutes and kg CO2.
 
 Emissions do not change the ladder or the optimizer cost, and `evaluate()` is untouched.
+
+## Regions
+
+The second hackathon twist asked how Rung holds up in another part of the world. The **Region** menu
+in the header switches between three profiles in `backend/regions.py`: Pier 7 Los Angeles (the
+default), Rotterdam, and Shanghai. A profile swaps the display units (lb or kg), the currency (USD, EUR
+at 0.86, or CNY at 7.1, fixed demo rates), the customs authority, the hold owner and hold names, the
+source and adapter names (Terminal49, Portbase, or China Single Window), the CO2 factor label, and the
+time zone label.
+
+Conversion happens only at the edges. A middleware runs `localize()` on every JSON response from
+`/api/`, except `/api/prompts` and the Retell functions, and rewrites generated sentences: "2,400 lb"
+becomes "1,089 kg", "440 USD" becomes "378 EUR", and "customs broker" becomes "customs agent".
+Identifiers such as steps, rule ids, hold kinds, and box numbers pass through. The browser converts
+numeric fields with `frontend/src/region.ts`, and the spoof form converts typed kilograms back to
+pounds. `POST /api/region {"region": "rotterdam"}` switches the profile, and `GET /api/state` returns it
+under `region`, with the choices under `regions`.
+
+`evaluate()`, the rules, trust, the ladder, and the gate optimizer never see a region.
+`tests/test_regions.py` checks that every decision and the gate plan are identical in all three
+regions. Only Terminal49 is a live adapter, so outside Los Angeles the data chip says the adapter is
+not connected and every field is simulated. [Rung, global](global.md) covers what changes in
+Rotterdam, Shanghai or Ningbo, Singapore, and Lagos.
 
 ## The ask call
 
