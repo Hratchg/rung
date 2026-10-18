@@ -21,7 +21,7 @@ PNG = HERE / "rung-poster.png"
 
 QR_CODES = {
     "qr-repo.svg": "https://github.com/Hratchg/rung",
-    "qr-video.svg": "https://github.com/Hratchg/rung/releases/tag/v1.1",
+    "qr-video.svg": "https://github.com/Hratchg/rung/releases/latest",
 }
 
 WIDTH_IN, HEIGHT_IN = 24, 36
