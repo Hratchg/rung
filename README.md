@@ -24,6 +24,7 @@ terminal feed goes dark. Rung keeps the gate open: it re-slots every truck in un
 hands the planner only the boxes that need a person.
 
 - [UI guide](docs/ui-guide.md): a 60 second tour, every screen with annotated screenshots, a plain language glossary of every term on screen, and common questions. Start here if you have no port or logistics background.
+- [Rung, global](docs/global.md): what stays the same in every port, what changes in Rotterdam, Shanghai, Singapore, and Lagos, and the region switch in the header.
 - [How Rung works](docs/how-it-works.md): architecture, trust, conflicts, urgency, the rules, the optimizer, the voice call, and what is live versus simulated.
 - [Demo pitch](docs/demo-pitch.md): a pitch that fits in 2:50 with the live voice call, a click by click run of show, a 30 second version, and a judges Q&A sheet.
 - [Funding pathway](docs/funding-pathway.md): the federal funding plan, with sources. An NSF SBIR Phase I grant to launch, DoD through USTRANSCOM and SDDC for the Harbor Night dual use, and port-led MARAD grants to roll out.
@@ -110,6 +111,7 @@ browser, and its chip reads **Retell web call**. Allow the microphone, and answe
 | Ask call | Box card, **Call the trucker** | The voice agent calls the trucker about a weight conflict. The transcript and outcome land on the card and re-evaluate the box |
 | Voice agent prompt | **See the agent prompt** on the box card, or **Voice agent prompt** in the dock | The exact Retell prompt from `scripts/retell_setup.py`, the values filled in for each call, the tools, and the fields read back after the call |
 | Truck idle and CO2 | Header, box card, Gate plan | Modelled idle hours and kg CO2 for trucks waiting at the gate: so far tonight in the header, per truck on the box card and the gate lists, and saved against closing the terminal in the gate headline. The factor and its DOE and EPA sources sit behind an info icon and in a footnote |
+| Region switch | Header, next to the terminal name | Los Angeles, Rotterdam, or Shanghai. Swaps lb or kg, USD, EUR, or CNY, customs and hold owner names, adapter names, the CO2 label, and the time zone label. Decisions never change |
 | Gate plan | Gate plan tab | A headline against closing the terminal, lanes by hourly windows with lane toggles, **Moved to a new slot**, and **No slot tonight** |
 | Audit log | Audit log tab | Every decision line newest first with the reason first, filtered by box |
 | Dark feed banner | Header | Shows how long a feed has been dark. The queue keeps running from the last snapshot |

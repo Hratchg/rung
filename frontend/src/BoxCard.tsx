@@ -7,6 +7,7 @@ import { ACTOR, CONFLICT_COPY, IDLE_TONE, STEP_META, emissionsNote, nextStepLine
 import { OverrideDialog, PlannerActions } from './Decide'
 import { SOURCE_FIELDS, SOURCE_TITLE, sayDateTime, sayHours, sayKg, sayNum, sayTime, sayValue } from './format'
 import { Notice, plainLfd } from './Queue'
+import { sourceVia } from './region'
 import SpoofForm from './Spoof'
 import { BadgeChip, CallTags, InfoHint, MiniLadder, NeedsYou, Section, SourceBadges, StepChip, TrustBar, UrgencyHelp, UrgencyMeter } from './ui'
 
@@ -317,6 +318,7 @@ function SourcePanel({ name, box }: { name: SourceName; box: BoxDetail }) {
       <header className="flex flex-wrap items-center justify-between gap-1">
         <h4 className="text-lg font-bold">{SOURCE_TITLE[name]}</h4>
         {detail.badge && <BadgeChip kind={detail.badge} />}
+        {sourceVia(name) && <p className="w-full text-slate-600">Via {sourceVia(name)}</p>}
       </header>
       <p className={detail.dark ? 'font-semibold text-red-800' : 'text-slate-600'}>{detail.dark ? `Dark. Last report ${detail.age} ago` : `Reported ${detail.age} ago`}</p>
       <TrustBar value={detail.trust} reason={detail.trust_reason} />

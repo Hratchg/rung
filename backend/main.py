@@ -9,8 +9,9 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 
 from fastapi import Body, FastAPI, HTTPException, Request
+from fastapi.responses import Response
 
-from . import config
+from . import config, regions
 from .audit import Audit, twist_log
 from .emissions import (
     IDLE_GALLONS_PER_HOUR,
@@ -38,6 +39,7 @@ from .models import (
     JumpIn,
     LaneIn,
     RatedIn,
+    RegionIn,
     SpeedIn,
     SpoofIn,
 )
@@ -69,6 +71,11 @@ scenario = Scenario(audit=Audit(config.AUDIT_PATH))
 poller = Poller(scenario.apply_live)
 voice = Voice()
 twist_diffs = TwistDiffs()
+region_holder = {"region": regions.REGIONS[regions.DEFAULT]}
+
+
+def region() -> regions.Region:
+    return region_holder["region"]
 
 
 def sync_call(number: str, call: dict) -> None:
@@ -111,6 +118,30 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(title="Rung", lifespan=lifespan)
 app.state.scenario = scenario
 app.state.poller = poller
+
+UNLOCALIZED = ("/api/prompts", "/api/retell/")
+
+
+@app.middleware("http")
+async def localize_api(request: Request, call_next):
+    """The API edge of the region switch: generated sentences leave in the region's units and names."""
+    response = await call_next(request)
+    path = request.url.path
+    r = region()
+    if (
+        r.id == regions.DEFAULT
+        or not path.startswith("/api/")
+        or path.startswith(UNLOCALIZED)
+        or not response.headers.get("content-type", "").startswith("application/json")
+    ):
+        return response
+    body = b"".join([chunk async for chunk in response.body_iterator])
+    try:
+        data = regions.localize(json.loads(body), r)
+    except ValueError:
+        return Response(body, status_code=response.status_code, media_type="application/json")
+    headers = {k: v for k, v in response.headers.items() if k.lower() not in ("content-length", "content-type")}
+    return Response(json.dumps(data), status_code=response.status_code, headers=headers, media_type="application/json")
 
 
 def minutes_since(later: datetime, earlier: datetime) -> int:
@@ -190,20 +221,24 @@ def state_payload() -> dict:
         "dark_feed": dark_feed(),
         "rated": sc.rated_info(),
         "emissions": emissions_info(),
+        "region": region().public(),
+        "regions": [{"id": r.id, "name": r.name, "locode": r.locode} for r in regions.REGIONS.values()],
     }
 
 
 def emissions_info() -> dict:
+    r = region()
     return {
         "kg_co2_per_idle_hour": round(KG_CO2_PER_IDLE_HOUR, 3),
         "idle_gallons_per_hour": IDLE_GALLONS_PER_HOUR,
         "kg_co2_per_gallon_diesel": KG_CO2_PER_GALLON_DIESEL,
         "idle_limit_hours": IDLE_LIMIT_H,
-        "label": (
+        "label": r.emissions_label or (
             f"{say_num(KG_CO2_PER_IDLE_HOUR, 2)} kg CO2 per truck idle hour. A heavy duty diesel truck burns about "
             f"{say_num(IDLE_GALLONS_PER_HOUR)} gallon of diesel an hour at idle, and each gallon makes "
             f"{say_num(KG_CO2_PER_GALLON_DIESEL, 2)} kg CO2."
         ),
+        "rules": r.emissions_rules,
         "sources": list(EMISSION_SOURCES),
     }
 
@@ -865,6 +900,16 @@ def post_rated(body: RatedIn) -> dict:
 @app.post("/api/scenario/speed")
 def post_speed(body: SpeedIn) -> dict:
     scenario.set_speed(body.minutes_per_second)
+    with scenario.lock:
+        return state_payload()
+
+
+@app.post("/api/region")
+def post_region(body: RegionIn) -> dict:
+    try:
+        region_holder["region"] = regions.get(body.region)
+    except KeyError:
+        raise HTTPException(400, f"Unknown region. Use one of {', '.join(regions.REGIONS)}.")
     with scenario.lock:
         return state_payload()
 
