@@ -9,8 +9,8 @@ dashed amber **Demo controls** dock at the bottom of the screen.
 
 1. Start the app with `make demo`. For the live call, set it up beforehand: `make tunnel` in a second terminal, `make retell-setup` once, then restart `make demo`. The steps are in the [README](../README.md#a-live-retell-call).
 2. Open http://127.0.0.1:8000 in a browser sized for the projector, 1280 by 720 or larger.
-3. Make one test call on any box, so the browser has already granted the microphone. Then press **Reset** in the dock.
-4. In the dock, press **Pause** next to **Minutes per second**. The header should read Tuesday, 22:00, Lanes open 6 of 6, and the dock should read Scenario `+00:00`.
+3. Make one test call on any box, so the browser has already granted the microphone. Then press **Everyday** in the dock to start the night over.
+4. In the dock, press **Pause** next to **Speed**. The header should read **Everyday mode**, Tuesday, 22:00, the summary at the top of the Queue should read 6 of 6 lanes open, and the dock should read Scenario `+00:00`.
 5. Open `CMAU9939083` and check the chip in the **Call the trucker** panel. **Retell web call** means the live agent is loaded. **Simulated call** means no Retell key is loaded and the call will be the scripted one. That still works: leave **The simulated trucker answers** on **Trucker backs the scale**.
 6. Close every terminal and editor window. Never put `.env` or a terminal on the projector.
 7. Rehearse the call once with a stopwatch. With the three trucker lines below, the answer lands about 35 seconds after you press **Call the trucker**, and the agent hangs up about 60 seconds after it. If the answer takes longer, use the cut rules at the end of the run of show.
@@ -46,8 +46,9 @@ Screen: the Queue, Tuesday, clock paused at 22:00.
 
 ### 0:15 Tuesday: the queue and the ladder (18 s)
 
-Screen: the Queue. Point at the headline **34 boxes need your decision**, then sweep left to right
-across the ladder: Release, Watch, Ask, Slow, Hold, and Hand set apart on the right.
+Screen: the Queue. Point at the **Everyday mode** pill in the header, then the headline **34 boxes
+need your decision**, then sweep left to right across the ladder: Release, Watch, Ask, Slow, Hold,
+and Hand set apart on the right.
 
 > This is Rung at Pier 7. 191 boxes are waiting. Rung reads all five sources for each one and puts it
 > on the gentlest safe step of this ladder, from Release on the left to Hand, where a person decides.
@@ -92,13 +93,13 @@ Press **Escape** to close the drawer.
 
 ### 1:48 Harbor Night: the gate plan (34 s)
 
-Click: the **Gate plan** tab. Then press **2** next to **Minutes per second** in the dock. Every
-scenario minute now takes half a real second, and the scripted events fire on their own.
+Click: the **Gate plan** tab. Then press **2** next to **Speed** in the dock. Every scenario minute
+now takes half a real second, and the scripted events fire on their own.
 
 > Same app, same code, the worst night of the year.
 
-- After 3 seconds the header turns dark blue and the chip reads **Harbor Night**.
-- After 5 seconds lanes 4 to 6 close. The header reads Lanes open 3 of 6, Closed 4 to 6, and the headline reads **Lanes 4 to 6 are closed. Rung keeps 96 of 129 trucks moving and saves 89 idle hours and 725 kg of CO2.**
+- After 3 seconds the header turns dark blue and the pill reads **Crisis mode**, next to **Harbor Night**.
+- After 5 seconds lanes 4 to 6 close. The red summary reads **Lanes 4 to 6 are closed. Rung keeps 96 of 129 trucks moving and saves 89 idle hours and 725 kg of CO2.**
 - After 10 seconds a customs hold lands on `TCLU7654321`.
 - After 20 seconds the red **Terminal feed dark** banner appears. Press **Pause** right away.
 
@@ -114,11 +115,13 @@ free day boxes 28 of 28, and truck idle CO2. At the pause the headline reads abo
 
 ### 2:22 The box that matters (17 s)
 
-Click: the **Queue** tab, the **Hold** step in the ladder, then **MSKU1234567**.
+Click: the **Queue** tab. The red **What went wrong tonight** cards name each problem. Click the
+**Hold** step in the ladder, then **MSKU1234567**.
 
-Screen: the big card reads **HOLD, Waits for its owner** and **Keep this truck at the gate until the
-customs broker clears it. The reefer evidence goes with it.** The amber reefer card below it reads
-**Product passed 2.6 C at 21:53**.
+Screen: a red line reads **Crisis mode. This box is affected tonight because its lane is closed, a
+feed it needs is dark and its reefer is in trouble under a hold.** The big card reads **HOLD, Waits
+for its owner** and **Keep this truck at the gate until the customs broker clears it. The reefer
+evidence goes with it.** The amber reefer card below it reads **Product passed 2.6 C at 21:53**.
 
 > Chilled beef, under a customs hold, power off since nine. Releasing it is not ours to give. Rung
 > says Hold, names the owner, and attaches the reefer evidence. The planner taps once.
@@ -148,8 +151,8 @@ top.
 
 ## The 30 second version
 
-Set up first: **Reset**, press **2** next to **Minutes per second**, open the **Gate plan** tab, and wait
-for the **Terminal feed dark** banner. Then press **Pause**.
+Set up first: press **Pause**, then **Crisis** in the dock, and open the **Gate plan** tab. The clock
+jumps to 22:44 on Harbor Night with every scripted crisis event fired, and stays paused.
 
 > Container terminals close the gate when their data goes bad, and every truck in line pays for it.
 > Rung reads five sources for every box, trusts each one as much as it has earned, and picks the

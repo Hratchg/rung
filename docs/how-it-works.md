@@ -29,11 +29,13 @@ The UI is built to be read from across a room at 1280 by 720. Every status color
 label, and rule and conflict ids such as R3 or C1 stay as secondary detail behind plain words. The
 [UI guide](ui-guide.md) walks through every screen with annotated screenshots and explains every term.
 
-- **Header**, in three rows. The first says where you are: Rung, Gate triage at Pier 7, the **Region** menu (Los Angeles, Rotterdam, or Shanghai), the night (Tuesday or Harbor Night), the scenario clock with its time zone label, lanes open, and the three screens, **Queue**, **Gate plan**, and **Audit log**. The second row is **Tonight so far**: Released, Reefers powered, Reefers lost, Fees avoided, Bookings kept, and Truck idle in hours and kg CO2, marked modelled. The third shows the latest scenario event on the left and where the data comes from on the right. A red banner sits above it while a feed is dark.
-- **Queue**. The headline counts the boxes that need a decision. Under it the ladder strip shows the six steps gentlest first, each with its count and a short meaning, and Hand set apart on the right. Click a step to filter. **How the ladder works** explains every step and how the votes are counted. Each row leads with plain words such as Weight mismatch or Hold by customs broker, and has one main button named for the action.
-- **Box card**. The big card says what Rung recommends, the next step in one sentence, the owner, the urgency, and where the step sits on the ladder, with **Your move** on the right. The call panel and the reefer card follow when they matter, then **Why Rung says** with the rule votes next to **Where the sources disagree**. Sources and trust, the full reason, the decision history, and the demo spoof form stay collapsed until opened.
-- **Gate plan**. The headline compares Rung against closing the terminal, in trucks kept, idle hours, and kg CO2. The lanes by hour grid follows with an icon key, then **Moved to a new slot** and **No slot tonight**.
-- **Demo controls**. A dashed amber dock at the bottom holds everything that drives the scenario: **Reset**, **Minutes per second**, the next scripted event, **Voice agent prompt**, and **More controls** with the event buttons, reefer faults, rated orders, the scripted timeline, and the twist log. None of it is part of the planner's app.
+- **Two modes**. Every screen says which mode the night is in. **Everyday mode** is an ordinary night such as Tuesday: a white header with a sky blue pill, and calm summaries that list only what to watch. **Crisis mode** is Harbor Night: a dark blue header with a red pill and a red rule, and summaries that lead with what went wrong and what Rung saves against closing the terminal. The mode comes from `state.mode`, `tuesday` or `harbor_night`, and only changes what the screen shows first, never a decision.
+- **Header**, one row plus a status line. The row says where you are: Rung, Gate triage at Pier 7, the mode pill and the night (hover the night for its tagline), the scenario clock with its time zone label, and the three screens, **Queue**, **Gate plan**, and **Audit log**. The status line shows the latest scenario event on the left, then the **Region** menu (Los Angeles, Rotterdam, or Shanghai) and where the data comes from. A red banner sits above it while a feed is dark.
+- **Mode summary**, at the top of the Queue. In Everyday mode, one card: lanes open, feeds reporting, and each issue to watch with a link to act on it. In Crisis mode, a red card: how many trucks Rung keeps moving against closing the terminal, then **What went wrong tonight**, one card per problem (lanes closed, a dark feed, a customs hold, a reefer with no power, silent reefers, rated orders), each with a link such as **Show the Hand boxes** or **See the gate plan**. **Hide** collapses the problems. Both show **Tonight so far** with the three numbers that matter in the mode (Released, Fees avoided, and Truck idle on an ordinary night; Bookings kept, Reefers lost, and Truck idle in a crisis), and **All numbers** shows all six.
+- **Queue**. The headline counts the boxes that need a decision. Under it the ladder strip shows the six steps gentlest first, each with its count and a short meaning, and Hand set apart on the right. Click a step to filter. **How the ladder works** explains every step and how the votes are counted. **Simple** view, the default, shows each box with Rung's step, plain issue tags such as Weight mismatch or Hold by customs broker, and one main button named for the action. **Details** opens the urgency, booking, clocks, and full reason under the row. **Detailed** view puts all of it in every row. The choice is remembered.
+- **Box card**. The big card says what Rung recommends, the next step in one sentence, the owner, the urgency, and where the step sits on the ladder, with **Your move** on the right. In Crisis mode, a red line above it names why tonight's crisis touches this box, for example its lane is closed and a feed it needs is dark. The call panel and the reefer card follow when they matter. The evidence sits in tabs: **Why Rung says** with the rule votes next to **Where the sources disagree**, **Sources and trust**, **Call the trucker**, and **Reason and history**. The demo spoof form stays collapsed until opened.
+- **Gate plan**. In Everyday mode the summary says how many booked trucks have a slot with all lanes open, and **Compare with closing the terminal** opens the comparison. In Crisis mode the red summary leads with the comparison against closing the terminal, in trucks kept, idle hours, and kg CO2. The lanes by hour grid follows with an icon key, then **Moved to a new slot** and **No slot tonight**.
+- **Demo controls**. A dashed amber dock at the bottom holds everything that drives the scenario: **Everyday** (start over at 22:00 on Tuesday), **Crisis** (jump to 22:44 on Harbor Night, after the scripted crisis events), **Speed**, **Voice agent prompt**, and **More controls** with the event buttons, reefer faults, rated orders, the scripted timeline, and the twist log. None of it is part of the planner's app.
 
 ## Architecture
 
@@ -60,7 +62,7 @@ uvicorn backend.main:app, one port
 Retell voice agent "Pier 7 gate desk", through PUBLIC_BASE_URL (a cloudflared quick tunnel)
 ```
 
-- State lives in memory. There is no database. Reset rebuilds everything from `scenario.json`.
+- State lives in memory. There is no database. A reset, the **Everyday** button in the dock, rebuilds everything from `scenario.json`.
 - Every API request first advances the scenario clock, fires any scripted events it passed, and re-evaluates every box still in the yard. A box gets a new audit line only when its decision changes.
 - `evaluate(box, now)` is pure: no clock reads, no randomness, no I/O. The same box at the same time always gets the same decision. Randomness exists only when the synthetic population is generated, with seed 7.
 - The two background jobs are plain asyncio tasks started in the FastAPI lifespan. There are no websockets and no job framework.
@@ -68,7 +70,9 @@ Retell voice agent "Pier 7 gate desk", through PUBLIC_BASE_URL (a cloudflared qu
 ## The scenario
 
 The clock starts at 22:00 on Oct 18 and runs one scenario minute per real second by default. The
-**Minutes per second** buttons in the Demo controls dock offer Pause, 1, 2, 5, and 10.
+**Speed** buttons in the Demo controls dock offer Pause, 1, 2, 5, and 10 scenario minutes per real
+second. **Everyday** resets to 22:00, and **Crisis** calls `POST /api/scenario/jump` with `+00:44`, so
+every scripted crisis event below has fired.
 
 The yard holds 191 boxes: the one hand written Harbor Night box `MSKU1234567` from the spec, plus 190
 synthetic boxes. The synthetic boxes have valid ISO 6346 numbers, 15 percent are reefers (frozen at
@@ -82,7 +86,7 @@ Scripted events, as offsets from 22:00:
 
 | Time | Event | What it does |
 | --- | --- | --- |
-| `+00:05` | `mode harbor_night` | The header turns dark blue and the chip reads Harbor Night |
+| `+00:05` | `mode harbor_night` | Crisis mode. The header turns dark blue and the pill reads Crisis mode |
 | `+00:10` | `lanes_down 4 5 6` | Half the gate closes. Boxes booked on those lanes go to SLOW and the gate re-solves |
 | `+00:20` | `hold_placed TCLU7654321` | A new customs hold. That box goes to HOLD, owner customs broker |
 | `+00:25` | `reefer_power_off MSKU1234567` | Logged as a no op, because the spec data has that unit off since 21:00 |
@@ -312,7 +316,7 @@ CO2. Closing the terminal idles them 129 h, 1,051 kg. Rung avoids 89 idle hours 
 On screen, every idle number is marked as modelled, and the factor and its sources sit one step
 back as secondary detail:
 
-- The header counter **Truck idle** shows `idle_hours` and `idle_co2_kg` so far tonight. Hover it for the same numbers if the terminal had closed, the factor, and the sources.
+- **Truck idle** in **Tonight so far**, at the top of the Queue, shows `idle_hours` and `idle_co2_kg` so far tonight. Hover it for the same numbers if the terminal had closed, the factor, and the sources. In Crisis mode the summary above it also reads the gate plan's `idle_hours_avoided` and `idle_co2_kg_avoided`.
 - The box card shows **Truck idle at the gate** under the recommendation: the minutes, the kg CO2, and the first sentence of the label, colored by cause with the words beside it. The info icon holds the full label and the factor.
 - The Gate plan headline and its fourth card use `idle_hours_avoided`, `idle_co2_kg_avoided`, and the two `idle_co2_kg_plan` values. A footnote names the factor and links both sources. **Moved to a new slot** and **No slot tonight** add each truck's idle minutes and kg CO2.
 

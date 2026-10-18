@@ -106,14 +106,15 @@ browser, and its chip reads **Retell web call**. Allow the microphone, and answe
 
 | Feature | Where | What you see |
 | --- | --- | --- |
-| Queue | Queue tab | A headline with how many boxes need a decision, the ladder strip with a count per step (click a step to filter), and one row per box with plain issue tags, urgency in words, clocks, live or simulated badges, and one main button named for the action. A dray carrier filter and **Show only these** for the boxes that need you |
+| Everyday and Crisis mode | Header pill, top of the Queue | Every screen says which mode the night is in. **Everyday mode** (an ordinary night, sky blue) shows a calm summary: lanes open, feeds reporting, and any issue to watch. **Crisis mode** (Harbor Night, red) leads with how many trucks Rung keeps moving against closing the terminal, then one card per problem tonight, each with a link to act on it. **Tonight so far** shows the three numbers that matter in the mode, with **All numbers** for the rest |
+| Queue | Queue tab | A headline with how many boxes need a decision, the ladder strip with a count per step (click a step to filter), and one row per box. **Simple** view shows the box, Rung's step, plain issue tags, and one main button named for the action, with **Details** for urgency, booking, clocks, and the reason. **Detailed** view shows all of it in every row. A dray carrier filter and **Show only these** for the boxes that need you |
 | The ladder | Queue, **How the ladder works** | Every step, what it means at the gate, who acts, and how the rule votes are counted |
-| Box card | Click a box number | What Rung recommends and the next step in one sentence, with **Your move** beside it. Then the call panel and reefer card when they matter, the rule votes, and where the sources disagree. Sources and trust, the full reason, and the history open on demand |
+| Box card | Click a box number | What Rung recommends and the next step in one sentence, with **Your move** beside it. In Crisis mode, a red line says why tonight's crisis touches this box. Then the call panel and reefer card when they matter, and tabs for the rule votes and where the sources disagree, sources and trust, the trucker call, and the reason and history |
 | Ask call | Box card, **Call the trucker** | The voice agent calls the trucker about a weight conflict. The transcript and outcome land on the card and re-evaluate the box |
 | Voice agent prompt | **See the agent prompt** on the box card, or **Voice agent prompt** in the dock | The exact Retell prompt from `scripts/retell_setup.py`, the values filled in for each call, the tools, and the fields read back after the call |
-| Truck idle and CO2 | Header, box card, Gate plan | Modelled idle hours and kg CO2 for trucks waiting at the gate: so far tonight in the header, per truck on the box card and the gate lists, and saved against closing the terminal in the gate headline. The factor and its DOE and EPA sources sit behind an info icon and in a footnote |
-| Region switch | Header, next to the terminal name | Los Angeles, Rotterdam, or Shanghai. Swaps lb or kg, USD, EUR, or CNY, customs and hold owner names, adapter names, the CO2 label, and the time zone label. Decisions never change |
-| Gate plan | Gate plan tab | A headline against closing the terminal, lanes by hourly windows with lane toggles, **Moved to a new slot**, and **No slot tonight** |
+| Truck idle and CO2 | Tonight so far, box card, Gate plan | Modelled idle hours and kg CO2 for trucks waiting at the gate: so far tonight in **Tonight so far**, per truck on the box card and the gate lists, and saved against closing the terminal in the crisis summary and the gate headline. The factor and its DOE and EPA sources sit behind an info icon and in a footnote |
+| Region switch | Header, status line | Los Angeles, Rotterdam, or Shanghai. Swaps lb or kg, USD, EUR, or CNY, customs and hold owner names, adapter names, the CO2 label, and the time zone label. Decisions never change |
+| Gate plan | Gate plan tab | In Everyday mode, how many booked trucks have a slot, with **Compare with closing the terminal** one click away. In Crisis mode, a headline and side by side numbers against closing the terminal. Then lanes by hourly windows with lane toggles, **Moved to a new slot**, and **No slot tonight** |
 | Audit log | Audit log tab | Every decision line newest first with the reason first, filtered by box |
 | Dark feed banner | Header | Shows how long a feed has been dark. The queue keeps running from the last snapshot |
 | Fake a reading | Box card, **Demo: fake a reading** | Type a fake carrier weight or toggle a hold, and watch trust and the step change at once |
@@ -122,8 +123,9 @@ browser, and its chip reads **Retell web call**. Allow the microphone, and answe
 | Twist log | Dock, **More controls**, **Twist log** | Each twist tag, what it added, when it merged, and the git diff of its commits |
 
 The dashed amber **Demo controls** dock at the bottom drives the scenario and is not part of the
-planner's app: **Reset**, **Minutes per second** (Pause stops the clock), the next scripted event, and
-**More controls** with Close lanes 4 to 6, Customs hold on TCLU7654321, Cut terminal feed, the reefer
+planner's app: **Everyday** (start over at 22:00 on Tuesday), **Crisis** (jump to 22:44 on Harbor
+Night, after the scripted crisis events), **Speed** in scenario minutes per second (Pause stops the
+clock), **Voice agent prompt**, and **More controls** with Close lanes 4 to 6, Customs hold on TCLU7654321, Cut terminal feed, the reefer
 faults, and rated orders. The scripted Harbor Night events fire on their own as the clock passes them.
 See [How Rung works](docs/how-it-works.md#the-scenario) for the timeline and the matching API calls,
 and the [UI guide](docs/ui-guide.md) for an annotated tour of every screen and a glossary of every term.
