@@ -26,6 +26,7 @@ hands the planner only the boxes that need a person.
 - [UI guide](docs/ui-guide.md): a 60 second tour, every screen with annotated screenshots, a plain language glossary of every term on screen, and common questions. Start here if you have no port or logistics background.
 - [How Rung works](docs/how-it-works.md): architecture, trust, conflicts, urgency, the rules, the optimizer, the voice call, and what is live versus simulated.
 - [Demo pitch](docs/demo-pitch.md): a pitch that fits in 2:50 with the live voice call, a click by click run of show, a 30 second version, and a judges Q&A sheet.
+- [Funding pathway](docs/funding-pathway.md): the federal funding plan, with sources. An NSF SBIR Phase I grant to launch, DoD through USTRANSCOM and SDDC for the Harbor Night dual use, and port-led MARAD grants to roll out.
 
 ## Quick start
 
