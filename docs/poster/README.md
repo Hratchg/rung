@@ -8,7 +8,7 @@ printed to a vector PDF with headless Chrome.
 | `poster.html`, `poster.css` | The poster. Sizes are in inches and points, so the page prints at 24 by 36 inches |
 | `images/` | Crops of real app screenshots: the Tuesday queue, the Harbor Night gate plan, a Hold box card, and a live Retell call |
 | `fonts/` | Geist and Geist Mono, the app's fonts, under the SIL Open Font License |
-| `qr-repo.svg`, `qr-video.svg` | QR codes to the GitHub repository and the v1.1 release with the demo video |
+| `qr-repo.svg`, `qr-video.svg` | QR codes to the GitHub repository and its latest release, which carries the demo video |
 | `rung-poster.pdf` | The print file |
 
 Rebuild after an edit. It needs Chrome or Chromium on PATH:
