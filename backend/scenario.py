@@ -458,7 +458,10 @@ class Scenario:
             at, _, event = self.events[self.next_event]
             self._settle_idle(at)
             self.next_event += 1
+            # Decisions carry state from the last evaluation (pending release), so each event is seen in turn.
+            self.now = at
             self.apply_event(event, at, scripted=True)
+            self.after_advance()
         self._settle_idle(t)
         self.now = t
         self.after_advance()
