@@ -577,5 +577,6 @@ export function useScenarioControls() {
     mutationFn: (event: ScenarioEvent) => post<State & { applied: ScenarioEvent }>('/api/scenario/event', event),
     onSuccess: refresh,
   })
-  return { reset, speed, fire }
+  const jump = useMutation({ mutationFn: (t: string) => post<State>('/api/scenario/jump', { t }), onSuccess: refresh })
+  return { reset, speed, fire, jump }
 }
