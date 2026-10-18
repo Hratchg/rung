@@ -5,6 +5,7 @@ Results are cached per HEAD and tag list, so the twist panel can poll every 2 se
 """
 from __future__ import annotations
 
+import string
 import subprocess
 import threading
 import time
@@ -18,6 +19,12 @@ REFRESH_S = 5.0
 PATCH_MAX_LINES = 400
 PATCH_MAX_CHARS = 40_000
 SEP = "\x1f"
+
+
+def tag_of(subject: str) -> str:
+    """The tag in a "twist: <tag>" subject. Merge commits add a title after it, as in "twist: twist-1, a title (#6)"."""
+    words = subject[len(PREFIX):].split()
+    return words[0].rstrip(string.punctuation) if words else ""
 
 
 class TwistDiffs:
@@ -58,7 +65,7 @@ class TwistDiffs:
             parts = line.split(SEP)
             if len(parts) != 4 or not parts[3].startswith(PREFIX):
                 continue
-            tag = parts[3][len(PREFIX):].strip()
+            tag = tag_of(parts[3])
             if tag:
                 by_tag.setdefault(tag, []).append(self._commit(*parts, via="message"))
         for name in (self._git("tag", "--list") or "").split():
