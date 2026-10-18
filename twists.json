@@ -1,4 +1,5 @@
 [
   {"tag": "twist-1-funding", "text": "Identify at least one federal funding pathway in the US government, through an agency, program, or military sector, as your primary or alternative funding source to launch your venture.", "received_at": "2026-10-17T17:00:00-07:00", "merged_at": null, "added": ["docs/funding-pathway.md"]},
-  {"tag": "twist-2-global", "text": "Let's make it global. How does the same solution hold up in another part of the world?", "received_at": "2026-10-17T17:00:00-07:00", "merged_at": null, "added": ["backend/regions.py", "frontend/src/region.ts", "docs/global.md"]}
+  {"tag": "twist-2-global", "text": "Let's make it global. How does the same solution hold up in another part of the world?", "received_at": "2026-10-17T17:00:00-07:00", "merged_at": null, "added": ["backend/regions.py", "frontend/src/region.ts", "docs/global.md"]},
+  {"tag": "twist-3-poster", "text": "Make a poster for your solution and submit it with the Devpost submission by 10 PM Pacific tonight. It gets printed for Demo Day.", "received_at": "2026-10-17T07:00:00-07:00", "merged_at": null, "added": ["docs/poster/poster.html", "docs/poster/rung-poster.pdf"]}
 ]
