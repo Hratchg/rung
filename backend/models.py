@@ -216,6 +216,7 @@ class JumpIn(BaseModel):
 
 class CallIn(BaseModel):
     mock_outcome: Literal["confirmed_empty", "confirmed_loaded", "reschedule_accepted", "unknown"] | None = None
+    simulate: bool = False
 
 
 class LaneIn(BaseModel):

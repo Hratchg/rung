@@ -762,7 +762,7 @@ class Scenario:
             }
             d = self._evaluate(state)
             kind = "Phone" if info["mode"] == "phone" else "Web"
-            mock = " Simulated, no Retell key." if info.get("mock") else ""
+            mock = f" {info.get('note') or 'Simulated.'}" if info.get("mock") else ""
             self.audit.write(
                 decision_line(
                     d,
