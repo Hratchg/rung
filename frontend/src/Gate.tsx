@@ -75,6 +75,7 @@ function EmissionsFootnote({ emissions }: { emissions: Emissions | undefined }) 
         </span>
       ))}
       <InfoHint label="How the CO2 factor is built" text={emissionsNote(emissions)} />
+      {emissions.rules && <span className="w-full">{emissions.rules}</span>}
     </p>
   )
 }

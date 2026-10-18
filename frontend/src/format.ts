@@ -1,3 +1,5 @@
+import { holdLabel, sayMoney, sayWeight } from './region'
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 /** Terminal local time straight from the ISO string, so the browser time zone never shifts it. */
@@ -30,7 +32,7 @@ export function sayKg(kg: number): string {
   return kg >= 100 ? Math.round(kg).toLocaleString('en-US') : sayNum(kg)
 }
 
-const lb = (v: unknown) => `${Math.round(Number(v)).toLocaleString('en-US')} lb`
+const lb = (v: unknown) => sayWeight(Number(v))
 const celsius = (v: unknown) => `${sayNum(Number(v))} C`
 const yesNo = (v: unknown) => (v === true ? 'Yes' : v === false ? 'No' : 'Unknown')
 const words = (v: unknown) => (v == null || v === '' ? 'Not set' : String(v).replace(/_/g, ' '))
@@ -38,13 +40,13 @@ type Hold = { name: string; status: string; description?: string }
 const holds = (v: unknown) => {
   const list = (v as Hold[] | undefined) ?? []
   if (list.length === 0) return 'None'
-  return list.map((h) => `${h.name} ${h.status === 'hold' ? 'active' : h.status}${h.description ? ` (${h.description})` : ''}`).join('. ')
+  return list.map((h) => `${holdLabel(h.name)} ${h.status === 'hold' ? 'active' : h.status}${h.description ? ` (${h.description})` : ''}`).join('. ')
 }
 type Fee = { type: string; amount: number; currency_code: string }
 const fees = (v: unknown) => {
   const list = (v as Fee[] | undefined) ?? []
   if (list.length === 0) return 'None'
-  return list.map((f) => `${f.type} ${Math.round(f.amount).toLocaleString('en-US')} ${f.currency_code}`).join('. ')
+  return list.map((f) => `${f.type} ${sayMoney(f.amount, undefined, f.currency_code)}`).join('. ')
 }
 
 /** Field label and formatter per source, in display order. Fields not listed are not shown. */
@@ -96,7 +98,7 @@ export function sayValue(key: string, value: unknown): string {
   if (typeof value === 'number') {
     if (key.endsWith('_c')) return celsius(value)
     if (key.includes('weight') || key === 'carrier' || key === 'weighbridge') return lb(value)
-    if (key.includes('usd')) return `${Math.round(value).toLocaleString('en-US')} USD`
+    if (key.includes('usd')) return sayMoney(value)
     if (key.endsWith('_h')) return sayHours(value)
     return sayNum(value)
   }

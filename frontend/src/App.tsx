@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
-import { Radio, WifiOff } from 'lucide-react'
+import { Globe, Radio, WifiOff } from 'lucide-react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { useAppState, type State } from './api'
+import { useAppState, useRegionSwitch, type State } from './api'
 import { AuditPanel, TwistPanel } from './Audit'
 import BoxCard from './BoxCard'
 import { NIGHT_COPY, emissionsNote, eventLine } from './copy'
@@ -10,6 +11,7 @@ import GateScreen from './Gate'
 import { PromptPanel } from './Prompts'
 import Queue from './Queue'
 import { laneList, sayKg, sayNum, sayTime } from './format'
+import { sayMoney, setRegion } from './region'
 import { BadgeChip, Hint } from './ui'
 
 type Route = { name: 'queue' } | { name: 'gate' } | { name: 'box'; number: string }
@@ -66,13 +68,43 @@ const POLLER_TEXT: Record<string, string> = {
 function DataChip({ state }: { state: State }) {
   const p = state.poller
   const ok = p.status === 'ok' && p.live_count > 0
+  const stub = state.region.adapter !== 'Terminal49'
   const legend = `Every source field carries a badge. Live: ${state.legend.live}. Simulated: ${state.legend.simulated}.`
+  const text = ok
+    ? `Terminal49 live for ${p.live_count} boxes. The rest simulated`
+    : stub
+      ? `All data simulated. ${state.region.adapter} adapter not connected`
+      : (POLLER_TEXT[p.status] ?? p.message)
   return (
-    <Hint text={`${legend} ${p.message ?? ''}`.trim()}>
+    <Hint text={`${legend} ${stub ? state.region.adapter_note : ''} ${p.message ?? ''}`.replace(/\s+/g, ' ').trim()}>
       <span tabIndex={0} className="flex items-center gap-2 whitespace-nowrap">
         {ok && <BadgeChip kind="live" />}
         <BadgeChip kind="simulated" />
-        <span className="opacity-85">{ok ? `Terminal49 live for ${p.live_count} boxes. The rest simulated` : (POLLER_TEXT[p.status] ?? p.message)}</span>
+        <span className="opacity-85">{text}</span>
+      </span>
+    </Hint>
+  )
+}
+
+function RegionSwitch({ state }: { state: State }) {
+  const change = useRegionSwitch()
+  const r = state.region
+  return (
+    <Hint text={`${r.port}, ${r.country}. Units in ${r.weight_unit === 'kg' ? 'kilograms' : 'pounds'} and ${r.currency}. Customs is ${r.customs}. Rung decides the same way in every region.`}>
+      <span>
+        <Select value={r.id} onValueChange={(id) => change.mutate(id)} disabled={change.isPending}>
+          <SelectTrigger aria-label="Region" className="h-9 border-current/30 text-lg font-semibold data-[size=default]:h-9 [&_svg]:text-current">
+            <Globe className="size-4" aria-hidden />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent position="popper" align="start">
+            {state.regions.map((x) => (
+              <SelectItem key={x.id} value={x.id} className="text-base">
+                {x.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </span>
     </Hint>
   )
@@ -132,6 +164,7 @@ function Header({ state, route, panel, onPanel }: { state: State; route: Route; 
           <span className="text-2xl font-black tracking-tight">Rung</span>
           <span className="text-lg opacity-75">Gate triage at {state.terminal}</span>
         </a>
+        <RegionSwitch state={state} />
         <span className="flex items-center gap-2">
           <Hint text={night.tagline}>
             <span tabIndex={0} className={`rounded-md px-3 py-0.5 text-lg font-bold ${harbor ? 'bg-amber-300 text-indigo-950' : 'bg-sky-100 text-sky-900'}`}>
@@ -142,7 +175,11 @@ function Header({ state, route, panel, onPanel }: { state: State; route: Route; 
         </span>
         <span className="flex items-baseline gap-2">
           <span className="text-2xl font-bold tabular-nums">{time}</span>
-          <span className="opacity-75">{date}</span>
+          <Hint text={`Local time in ${state.region.name}, ${state.region.utc_offset}. The scenario is the same night shift at whichever port you pick.`}>
+            <span tabIndex={0} className="opacity-75">
+              {date} {state.region.tz_label}
+            </span>
+          </Hint>
         </span>
         <span className="text-lg">
           Lanes open <strong>{state.lanes_open.length}</strong> of {state.lanes}
@@ -170,7 +207,7 @@ function Header({ state, route, panel, onPanel }: { state: State; route: Route; 
           tone={c.reefers_lost > 0 ? (harbor ? 'text-red-300' : 'text-red-700') : ''}
           hint="Reefers whose cargo has warmed past its loss limit."
         />
-        <Stat label="Fees avoided" value={`${c.demurrage_avoided_usd.toLocaleString('en-US')} USD`} hint="Demurrage, the daily storage fee a box owes once its free days run out, saved by releasing boxes in time." />
+        <Stat label="Fees avoided" value={sayMoney(c.demurrage_avoided_usd)} hint="Demurrage, the daily storage fee a box owes once its free days run out, saved by releasing boxes in time." />
         <Stat label="Bookings kept" value={`${c.throughput_pct}%`} hint="Share of the bookings for tonight that still have a gate slot." />
         <Stat
           label="Truck idle"
@@ -194,6 +231,7 @@ export default function App() {
       <p className="p-6 text-lg">{state.isError ? 'Cannot reach the Rung server. Retrying every 2 seconds.' : 'Loading Pier 7'}</p>
     )
   }
+  setRegion(state.data.region)
   return (
     <TooltipProvider delayDuration={150}>
       <div className="min-h-screen pb-24">

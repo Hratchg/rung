@@ -34,7 +34,32 @@ export type Emissions = {
   kg_co2_per_gallon_diesel: number
   idle_limit_hours: number
   label: string
+  rules?: string
   sources: { label: string; url: string }[]
+}
+
+export type Region = {
+  id: string
+  name: string
+  port: string
+  country: string
+  locode: string
+  timezone: string
+  tz_label: string
+  utc_offset: string
+  weight_unit: 'lb' | 'kg'
+  currency: string
+  per_usd: number
+  customs: string
+  customs_short: string
+  customs_broker: string
+  hold_labels: Record<string, string>
+  hold_text: Record<string, string>
+  adapter: string
+  adapter_note: string
+  sources: Record<string, string>
+  appointments: string
+  language: string
 }
 
 export type Poller = {
@@ -75,6 +100,8 @@ export type State = {
   dark_feed: DarkFeedLine[]
   rated: RatedInfo
   emissions: Emissions
+  region: Region
+  regions: { id: string; name: string; locode: string }[]
 }
 
 export type DarkFeedLine = {
@@ -521,6 +548,11 @@ export function useSpoof(number: string) {
 export function useRatedToggle() {
   const refresh = useRefreshAll()
   return useMutation({ mutationFn: (on: boolean) => post<State>('/api/scenario/rated', { on }), onSuccess: refresh })
+}
+
+export function useRegionSwitch() {
+  const refresh = useRefreshAll()
+  return useMutation({ mutationFn: (region: string) => post<State>('/api/region', { region }), onSuccess: refresh })
 }
 
 export function useLaneToggle() {

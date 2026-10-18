@@ -239,3 +239,7 @@ class SpoofIn(BaseModel):
 
 class SpeedIn(BaseModel):
     minutes_per_second: float = Field(ge=0, le=120)
+
+
+class RegionIn(BaseModel):
+    region: str
