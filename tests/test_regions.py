@@ -117,9 +117,9 @@ def test_localize_leaves_identifiers_alone():
     }
 
 
-def test_twist_log_has_the_global_twist_pending_merge():
+def test_twist_log_has_the_global_twist_merged():
     entries = json.loads((Path(__file__).parent.parent / "twists.json").read_text())
     entry = next(e for e in entries if e["tag"] == "twist-2-global")
     assert entry["received_at"] == "2026-10-17T17:00:00-07:00"
-    assert entry["merged_at"] is None
+    assert entry["merged_at"] == "2026-10-17T17:21:29-07:00"
     assert "make it global" in entry["text"]
