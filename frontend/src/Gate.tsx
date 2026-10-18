@@ -1,9 +1,10 @@
-import { useMemo, type ReactNode } from 'react'
-import { ArrowRightLeft, CalendarClock, Flag, Snowflake, type LucideIcon } from 'lucide-react'
+import { useMemo, useState, type ReactNode } from 'react'
+import { ArrowRightLeft, CalendarClock, ChevronDown, Flag, ShieldCheck, Siren, Snowflake, type LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAppState, useGate, useLaneToggle, type Emissions, type Gate, type GateChip, type GateIdle, type RatedRowStatus } from './api'
-import { emissionsNote } from './copy'
+import { NIGHT_COPY, emissionsNote } from './copy'
 import { laneList, sayHours, sayKg, sayNum, sayTime } from './format'
+import { MODE_COPY, nightMode } from './mode'
 import { Notice } from './Queue'
 import { InfoHint, StepChip } from './ui'
 
@@ -81,9 +82,88 @@ function EmissionsFootnote({ emissions }: { emissions: Emissions | undefined }) 
 }
 
 function Hero({ gate }: { gate: Gate }) {
-  const emissions = useAppState().data?.emissions
-  const { rung, blunt, appointments, reefers_total, lfd_total, idle_hours_avoided, idle_co2_kg_avoided } = gate.compare
+  const state = useAppState().data
+  const crisis = nightMode(state?.mode ?? '') === 'crisis'
   const closed = gate.lanes.filter((l) => !l.open).map((l) => l.id)
+  if (!crisis && closed.length === 0) return <CalmHero gate={gate} emissions={state?.emissions} />
+  const night = state ? (NIGHT_COPY[state.mode]?.name ?? state.mode) : ''
+  const { rung, appointments, idle_hours_avoided, idle_co2_kg_avoided } = gate.compare
+  return (
+    <section
+      className={`rounded-xl bg-white p-4 shadow-sm ${crisis ? 'border-2 border-red-600' : 'border border-slate-200'}`}
+      aria-label="Rung against closing the terminal"
+    >
+      {crisis && (
+        <p className="mb-1 flex items-center gap-2 text-lg font-bold text-red-700">
+          <Siren className="size-5" aria-hidden />
+          {MODE_COPY.crisis.label}. {night}
+        </p>
+      )}
+      <h2 className="text-2xl font-bold tracking-tight">
+        {closed.length > 0
+          ? `Lanes ${laneList(closed)} are closed. Rung keeps ${rung.kept} of ${appointments} trucks moving and saves ${sayNum(idle_hours_avoided, 0)} idle hours and ${sayKg(idle_co2_kg_avoided)} kg of CO2.`
+          : `All ${gate.lanes.length} lanes are open. Rung keeps ${rung.kept} of ${appointments} trucks on the plan.`}
+      </h2>
+      <p className="text-lg text-slate-700">
+        The blunt move on a bad night is to close the terminal. Then nothing leaves and every truck in line waits. <SolverLine gate={gate} />
+      </p>
+      <Comparison gate={gate} emissions={state?.emissions} />
+    </section>
+  )
+}
+
+function CalmHero({ gate, emissions }: { gate: Gate; emissions: Emissions | undefined }) {
+  const [compare, setCompare] = useState(false)
+  const { rung, appointments, reefers_total, lfd_total } = gate.compare
+  const rest = [
+    gate.held.length > 0 ? `${gate.held.length} on Hold wait for their owner.` : '',
+    gate.overflow.length > 0 ? `${gate.overflow.length} have no slot tonight.` : '',
+  ].join(' ')
+  const stats: [string, string, string][] = [
+    ['Reefers with a slot', String(rung.reefers_kept), `of ${reefers_total}`],
+    ['Last free day boxes with a slot', String(rung.lfd_kept), `of ${lfd_total}`],
+    ['Truck idle at the gate tonight', `${sayKg(rung.idle_co2_kg_plan)} kg CO2`, `${sayNum(rung.idle_hours_plan, 0)} h, modelled`],
+  ]
+  return (
+    <section className="rounded-xl border border-l-8 border-slate-200 border-l-sky-500 bg-white p-4 shadow-sm" aria-label="Gate plan tonight">
+      <p className="mb-1 flex items-center gap-2 text-lg font-bold text-sky-900">
+        <ShieldCheck className="size-5" aria-hidden />
+        {MODE_COPY.everyday.label}
+      </p>
+      <h2 className="text-2xl font-bold tracking-tight">
+        All {gate.lanes.length} lanes are open. {rung.kept} of {appointments} booked trucks have a slot tonight.
+      </h2>
+      <p className="text-lg text-slate-700">
+        {rest} When a lane closes, Rung moves every booked truck to the best open slot, reefers and last free day boxes first. <SolverLine gate={gate} />
+      </p>
+      <dl className="mt-2 flex flex-wrap items-baseline gap-x-8 gap-y-1">
+        {stats.map(([label, value, note]) => (
+          <div key={label} className="flex items-baseline gap-2">
+            <dt className="text-slate-700">{label}</dt>
+            <dd className="flex items-baseline gap-1.5">
+              <span className="text-xl font-bold tabular-nums">{value}</span>
+              <span className="text-slate-600">{note}</span>
+            </dd>
+          </div>
+        ))}
+        <InfoHint label="How the CO2 factor is built" text={emissionsNote(emissions)} />
+      </dl>
+      <button
+        type="button"
+        aria-expanded={compare}
+        onClick={() => setCompare(!compare)}
+        className="mt-2 flex items-center gap-1 font-semibold text-sky-900 underline decoration-sky-300 underline-offset-4 hover:decoration-sky-800"
+      >
+        {compare ? 'Hide the comparison with closing the terminal' : 'Compare with closing the terminal'}
+        <ChevronDown className={`size-4 transition-transform duration-150 ${compare ? 'rotate-180' : ''}`} aria-hidden />
+      </button>
+      {compare && <Comparison gate={gate} emissions={emissions} />}
+    </section>
+  )
+}
+
+function Comparison({ gate, emissions }: { gate: Gate; emissions: Emissions | undefined }) {
+  const { rung, blunt, appointments, reefers_total, lfd_total } = gate.compare
   const big: [string, number, number, number][] = [
     ['Trucks kept on the gate plan', rung.kept, 0, appointments],
     ['Reefers kept', rung.reefers_kept, blunt.reefers_kept, reefers_total],
@@ -95,18 +175,7 @@ function Hero({ gate }: { gate: Gate }) {
     ['Reefers lost', String(rung.reefers_lost), String(blunt.reefers_lost)],
   ]
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" aria-label="Rung against closing the terminal">
-      <h2 className="text-2xl font-bold tracking-tight">
-        {closed.length > 0
-          ? `Lanes ${laneList(closed)} are closed. Rung keeps ${rung.kept} of ${appointments} trucks moving and saves ${sayNum(idle_hours_avoided, 0)} idle hours and ${sayKg(idle_co2_kg_avoided)} kg of CO2.`
-          : `All ${gate.lanes.length} lanes are open. Rung keeps ${rung.kept} of ${appointments} trucks on the plan.`}
-      </h2>
-      <p className="text-lg text-slate-700">
-        {closed.length > 0
-          ? 'The blunt move on a bad night is to close the terminal. Then nothing leaves and every truck in line waits.'
-          : 'When lanes close, Rung moves every booked truck to the best open slot, reefers and last free day boxes first.'}{' '}
-        <SolverLine gate={gate} />
-      </p>
+    <div>
       <div className="mt-3 grid gap-3 md:grid-cols-4">
         {big.map(([label, a, b, total]) => (
           <div key={label} className="rounded-lg border border-slate-200 px-4 py-3">
@@ -150,7 +219,7 @@ function Hero({ gate }: { gate: Gate }) {
         ))}
       </dl>
       <EmissionsFootnote emissions={emissions} />
-    </section>
+    </div>
   )
 }
 
