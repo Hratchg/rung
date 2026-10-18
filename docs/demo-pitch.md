@@ -1,16 +1,26 @@
 # Rung demo pitch
 
-A pitch that fits in 2:50 with the live voice call, a click by click run of show on the real app, a
-30 second version, and a judges Q&A sheet. Button and label names below are exactly as they appear on
-screen. Planner controls sit in the app itself. Everything that drives the scenario sits in the
-dashed amber **Demo controls** dock at the bottom of the screen.
+A pitch that fits in 2:51 with the live voice call and all three hackathon twists, a click by click
+run of show on the real app, a 30 second version, and a judges Q&A sheet. Button and label names
+below are exactly as they appear on screen. Planner controls sit in the app itself. Everything that
+drives the scenario sits in the dashed amber **Demo controls** dock at the bottom of the screen.
+
+The three twists, and where each one shows:
+
+| Twist | What it asked | Where it is in the pitch |
+| --- | --- | --- |
+| 1, funding | A federal funding pathway to launch the venture | 2:30, the funding card: NSF SBIR Phase I first, DoD with USTRANSCOM and SDDC, and MARAD PIDP as alternatives. Plan in [funding-pathway.md](funding-pathway.md) |
+| 2, global | How the same solution holds up in another part of the world | 2:03, the same box in Los Angeles, Rotterdam, and Shanghai on the live app. Plan in [global.md](global.md) |
+| 3, poster | A 24 by 36 inch Demo Day poster | 2:40, the poster, [rung-poster.pdf](poster/rung-poster.pdf) |
+
+The **Twist log** at 2:20 shows all three as merged, with the files each one added and its git diff.
 
 ## Before you go on
 
-1. Start the app with `make demo`. For the live call, set it up beforehand: `make tunnel` in a second terminal, `make retell-setup` once, then restart `make demo`. The steps are in the [README](../README.md#a-live-retell-call).
-2. Open http://127.0.0.1:8000 in a browser sized for the projector, 1280 by 720 or larger.
+1. Start the app with `make demo`. For the live call, set it up beforehand: `make tunnel` in a second terminal, `make retell-setup` once, then restart `make demo`. The steps are in the [README](../README.md#a-live-retell-call). A quick tunnel can expire. If calls stop recording an outcome, stop `make tunnel` and start it again. It points the Retell agent at the new address on its own.
+2. Open http://127.0.0.1:8000 in a browser sized for the projector, 1280 by 720 or larger. Open `docs/poster/rung-poster.pdf` in a second tab of the same browser.
 3. Make one test call on any box, so the browser has already granted the microphone. Then press **Reset** in the dock.
-4. In the dock, press **Pause** next to **Minutes per second**. The header should read Tuesday, 22:00, Lanes open 6 of 6, and the dock should read Scenario `+00:00`.
+4. Check that the **Region** menu in the header reads **Los Angeles**. In the dock, press **Pause** next to **Minutes per second**. The header should read Tuesday, 22:00, Lanes open 6 of 6, and the dock should read Scenario `+00:00`.
 5. Open `CMAU9939083` and check the chip in the **Call the trucker** panel. **Retell web call** means the live agent is loaded. **Simulated call** means no Retell key is loaded and the call will be the scripted one. That still works: leave **The simulated trucker answers** on **Trucker backs the scale**.
 6. Close every terminal and editor window. Never put `.env` or a terminal on the projector.
 7. Rehearse the call once with a stopwatch. With the three trucker lines below, the answer lands about 35 seconds after you press **Call the trucker**, and the agent hangs up about 60 seconds after it. If the answer takes longer, use the cut rules at the end of the run of show.
@@ -27,123 +37,191 @@ finish its turn. The lines:
 
 | Start | Beat | Length |
 | --- | --- | --- |
-| 0:00 | The problem | 15 s |
-| 0:15 | Tuesday: the queue and the ladder | 18 s |
-| 0:33 | The live ask call | 57 s |
-| 1:30 | The voice agent prompt | 18 s |
-| 1:48 | Harbor Night: the gate plan | 34 s |
-| 2:22 | The box that matters | 17 s |
-| 2:39 | The audit log and the close | 11 s |
-| 2:50 | End | |
+| 0:00 | The problem | 9 s |
+| 0:09 | Tuesday: the queue and the ladder | 12 s |
+| 0:21 | The live ask call | 49 s |
+| 1:10 | The voice agent prompt | 15 s |
+| 1:25 | Harbor Night: the gate plan and the CO2 | 29 s |
+| 1:54 | The box that matters | 9 s |
+| 2:03 | Twist 2: the same box in Rotterdam and Shanghai | 17 s |
+| 2:20 | The Twist log | 10 s |
+| 2:30 | Twist 1: the funding pathway | 10 s |
+| 2:40 | Twist 3: the poster and the close | 11 s |
+| 2:51 | End | |
 
-### 0:00 The problem (15 s)
+### 0:00 The problem (9 s)
 
 Screen: the Queue, Tuesday, clock paused at 22:00.
 
-> Every truck that leaves a container terminal goes through a gate. Five systems describe every box,
-> and they disagree all the time. On a bad night the safe move is to close the gate, and every truck
-> in line pays for it.
+> Five systems describe every box at a container terminal, and they disagree. On a bad night the safe
+> move is to close the gate, and every truck in line pays.
 
-### 0:15 Tuesday: the queue and the ladder (18 s)
+### 0:09 Tuesday: the queue and the ladder (12 s)
 
 Screen: the Queue. Point at the headline **34 boxes need your decision**, then sweep left to right
 across the ladder: Release, Watch, Ask, Slow, Hold, and Hand set apart on the right.
 
-> This is Rung at Pier 7. 191 boxes are waiting. Rung reads all five sources for each one and puts it
-> on the gentlest safe step of this ladder, from Release on the left to Hand, where a person decides.
+> This is Rung at Pier 7, Los Angeles. It reads all five sources for each of 191 boxes and puts each
+> one on the gentlest safe step, from Release to Hand.
 
-Click: the **Ask** step in the ladder. Two rows remain. Click **CMAU9939083**.
+Click: the **Ask** step in the ladder. Two rows remain.
 
-### 0:33 The live ask call (57 s)
+> Ask: two boxes need fresher facts before anyone acts.
+
+Click: **CMAU9939083**.
+
+### 0:21 The live ask call (49 s)
 
 Screen: the box card. The big card reads **Rung recommends ASK, Get fresher facts** and **The weights
 disagree. Get a reweigh or call the trucker before it leaves.**
 
-> The manifest says 36,000 pounds. The scale says 40,500. Rung does not guess. It asks. Its voice
-> agent calls the trucker right now.
+> The manifest says 36,000 pounds. The scale says 40,500. Rung does not guess. It asks the trucker.
 
-Click: **Call the trucker** in the **Call the trucker** panel by 0:40. The status reads Connecting, then
+Click: **Call the trucker** in the **Call the trucker** panel by 0:24. The status reads Connecting, then
 On the call.
 
-The agent introduces itself as the Pier 7 gate desk, checks it has Dana Ruiz, reads both weights, and
-asks whether the box is loaded as weighed. The trucker answers with the three lines above.
+The agent introduces itself as the Pier 7 gate desk, spells the box number, checks it has Dana Ruiz,
+reads both weights, and asks whether the box is loaded as weighed. The trucker answers with the three
+lines above. Say nothing over the call. Let the room hear it.
 
-When the agent records the answer, the outcome box reads **Trucker backs the scale** and the big card
-turns violet: **HAND, You decide now**, with **The trucker backed the scale, so the manifest is wrong.
-You decide what happens to this box.** The button under **Your move** now reads **Decide**.
+The answer lands about 35 seconds after the click, around 1:00. The outcome box reads **Trucker backs
+the scale**, and the big card turns violet: **HAND, You decide now**, with **The trucker backed the
+scale, so the manifest is wrong. You decide what happens to this box.** The button under **Your move**
+now reads **Decide**.
 
-> The trucker backed the scale, so the manifest is wrong. Rung will not pick a side on its own. A
-> person decides, with the call on the record. That was a real call, through Retell.
+> The agent records the answer straight into Rung, mid call. The trucker backed the scale, so the
+> manifest is wrong, and a person decides.
 
-The answer lands around 1:15. The agent then reads it back and says goodbye, so the call keeps running
-for about 20 more seconds and ends while the prompt drawer is open. Do not wait for it. The transcript
-lands on the card after the agent hangs up.
+The agent then reads the answer back and says goodbye, so the call keeps running for about 25 more
+seconds and ends while the prompt drawer is open. Stay on the box card until it hangs up: leaving the
+card ends the call. The transcript lands on the card after the agent hangs up.
 
-### 1:30 The voice agent prompt (18 s)
+### 1:10 The voice agent prompt (15 s)
 
 Click: **See the agent prompt**, next to **Call again** in the same panel. The **Voice agent prompt**
 drawer opens. Scroll slowly from **Identity** down to **Weight check call** and its four outcomes.
 
-> This is the exact prompt that agent ran, read live from our setup script. Who it is, how to say a
-> container number, the weight check steps, and the only four answers it may record. The model runs
-> the conversation. Rung's rules decide what happens next.
+> That was a real call, through Retell. This is the exact prompt the agent runs, read live from our
+> setup script. The weight check steps, and the only four answers it may record. The model runs the
+> call. Rung's rules decide what happens next.
 
-Press **Escape** to close the drawer.
+Wait until the agent hangs up, about 60 seconds after the click, then press **Escape** to close the drawer.
 
-### 1:48 Harbor Night: the gate plan (34 s)
+### 1:25 Harbor Night: the gate plan and the CO2 (29 s)
 
 Click: the **Gate plan** tab. Then press **2** next to **Minutes per second** in the dock. Every
 scenario minute now takes half a real second, and the scripted events fire on their own.
 
-> Same app, same code, the worst night of the year.
+> Same app, the worst night of the year: Harbor Night.
 
 - After 3 seconds the header turns dark blue and the chip reads **Harbor Night**.
-- After 5 seconds lanes 4 to 6 close. The header reads Lanes open 3 of 6, Closed 4 to 6, and the headline reads **Lanes 4 to 6 are closed. Rung keeps 96 of 129 trucks moving and saves 89 idle hours and 725 kg of CO2.**
-- After 10 seconds a customs hold lands on `TCLU7654321`.
-- After 20 seconds the red **Terminal feed dark** banner appears. Press **Pause** right away.
+- After 5 seconds lanes 4 to 6 close. The header reads Lanes open 3 of 6, Closed 4 to 6.
+- After 10 seconds a customs hold lands on `TCLU7654321`. Press **5** to speed up.
+- About 4 seconds later the red **Terminal feed dark** banner appears. Press **Pause** right away. The dock reads `+00:40`.
 
-Say the first line while the events fire, and the rest after **Pause**.
-
-> Half the gate went down, customs placed a hold, and the terminal feed went dark. Rung re-planned
-> every truck in under a millisecond. It keeps 96 of 129 trucks moving and every reefer, and by our
-> model it saves about 750 kilograms of CO2 from trucks idling at the gate.
+> Lanes 4 to 6 close, and Rung re-plans every booked truck in under a millisecond, reefers and last
+> free day boxes first. A customs hold lands, and the terminal feed goes dark. Rung keeps running from
+> its last snapshot, and only trucks due at the gate now come to the planner.
 
 Point at the four cards under the headline: Rung 96 against Closed terminal 0, reefers 20 of 20, last
-free day boxes 28 of 28, and truck idle CO2. At the pause the headline reads about 92 idle hours and
-750 kg. The plan changes as the night moves, so these numbers drift by a few kg.
+free day boxes 28 of 28, and truck idle CO2.
 
-### 2:22 The box that matters (17 s)
+> Rung keeps 96 of 129 trucks moving, every reefer, and every last free day box. Closing the terminal
+> keeps none. And by our model it saves about 750 kilograms of CO2 from trucks idling at the gate.
 
-Click: the **Queue** tab, the **Hold** step in the ladder, then **MSKU1234567**.
+At the pause the headline reads **saves 92 idle hours and 749 kg of CO2**. The fourth card shows the
+two totals behind it, Rung about 302 kg against Closed terminal about 1,051 kg, and the 750 kg in the
+line is the difference. The plan changes as the night moves, so these numbers drift by a few kg.
+
+### 1:54 The box that matters (9 s)
+
+Click: the **Queue** tab, then **MSKU1234567** in the Hold group. If it is below the fold, press the
+**Hold** step in the ladder first.
 
 Screen: the big card reads **HOLD, Waits for its owner** and **Keep this truck at the gate until the
 customs broker clears it. The reefer evidence goes with it.** The amber reefer card below it reads
 **Product passed 2.6 C at 21:53**.
 
-> Chilled beef, under a customs hold, power off since nine. Releasing it is not ours to give. Rung
-> says Hold, names the owner, and attaches the reefer evidence. The planner taps once.
+> Chilled beef, under a customs hold, power off and warming. Rung says Hold, names the owner, and
+> attaches the reefer evidence. The planner confirms with one tap, and it lands in the audit log.
 
 Click: **Confirm hold** under **Your move**.
 
-### 2:39 The audit log and the close (11 s)
+### 2:03 Twist 2: the same box in Rotterdam and Shanghai (17 s)
 
-Click: the **Audit log** tab in the header. It opens filtered to `MSKU1234567`, with the planner line on
-top.
+Stay on `MSKU1234567`. Scroll down until **Where the sources disagree** shows its first conflict,
+**The manifest and the scale disagree**, with **Manifest says 2,400 lb** and **Scale says 44,100 lb**.
+Keep the **Owner** row of the big card in view.
 
-> Every step, call, and override lands here with its reason, and a person signs every hard call.
-> That is Rung.
+> Twist two: go global. Same box, same engine. Switch the port from Los Angeles to Rotterdam.
+
+Click: the **Region** menu in the header, which reads **Los Angeles**, then **Rotterdam**. Point at what
+changed:
+
+- The clock label reads **CEST**, and **Fees avoided** reads **0 EUR**.
+- The data chip reads **All data simulated. Portbase adapter not connected**.
+- **Owner** reads **customs agent**.
+- The conflict reads **Manifest says 1,089 kg** and **Scale says 20,003 kg**.
+- The ladder still shows **Hold**, and **Urgency** still reads **95 High**.
+
+> Rotterdam: Dutch Customs, so a customs agent owns the hold. The weights read in kilograms, fees in
+> euros, times in CEST. Still Hold, same urgency.
+
+Click: the **Region** menu, then **Shanghai**. The clock label reads **CST**, fees read **CNY**, the chip
+names the **China Single Window** adapter, and **Owner** reads **customs declaration agent**.
+
+> Shanghai: China Customs and a customs declaration agent, yuan and CST. The ladder, trust, and gate
+> plan never change. Only the edges do.
+
+Leave the region on **Shanghai** for now. Set it back to **Los Angeles** after the pitch.
+
+### 2:20 The Twist log (10 s)
+
+Click: **More controls** in the dock, then **Twist log**. The **Twist log** drawer lists three rows,
+`twist-1-funding`, `twist-2-global`, and `twist-3-poster`, each marked **Merged**, with **Received**,
+**Merged**, **Added**, and its **Git diff**. Scroll slowly to the bottom.
+
+> Rung took in all three hackathon twists. The Twist log shows each one merged, with the files it
+> added and its git diff.
+
+Press **Escape** to close the drawer, then **Fewer controls**.
+
+### 2:30 Twist 1: the funding pathway (10 s)
+
+In the video this is a title card. Live, switch to the poster tab and point at its **Federal funding
+pathway** panel, which lists the same three programs.
+
+| Role | Program | One line |
+| --- | --- | --- |
+| Primary, Launch | NSF SBIR Phase I, America's Seed Fund, solicitation NSF 26-510 | Up to $305K over 6 to 18 months to prove Rung on live San Pedro Bay terminal data, in a shadow mode pilot with a Port of Long Beach terminal |
+| Alternative, Harden | DoD SBIR with USTRANSCOM and SDDC | Monthly DoD SBIR releases, Phase I about $315K. Harbor Night run as a port readiness exercise at strategic seaports such as Long Beach |
+| Alternative, Scale | MARAD PIDP, the Port Infrastructure Development Program, port led | Up to 80 percent federal share to roll Rung out across every gate lane, with the port as lead applicant |
+
+> Twist one: funding. Rung launches on an NSF SBIR Phase I grant. DoD, through USTRANSCOM and SDDC,
+> and MARAD's port grants are the alternatives.
+
+### 2:40 Twist 3: the poster and the close (11 s)
+
+Screen: the poster tab, `rung-poster.pdf`, fitted to the screen. Zoom in on the **Harbor Night results**
+band, then on the header, **Keep the gate open when the data goes bad.**
+
+> Twist three: the 24 by 36 inch Demo Day poster, built from the same numbers the app just showed.
+> Keep the gate open when the data goes bad. That is Rung.
 
 ### Cut rules
 
-- If the call outcome has not landed by 1:35, keep talking over the hero card until it does, then skip the prompt drawer scroll and only open and close it.
-- If the clock reads 2:30 or later when you reach the box that matters, skip **Confirm hold** and the audit log, and say the close line on the box card.
+- If the call outcome has not landed by 1:10, keep talking over the hero card until it does, then skip the prompt drawer scroll and only open and close it.
+- If the clock reads 2:10 or later when you reach the box that matters, skip **Confirm hold** and go straight to the region switch.
+- If the clock reads 2:30 or later after the region switch, skip the Twist log and go to the poster tab. Name the three funding programs while pointing at the poster's **Federal funding pathway** panel.
 - If the dark feed banner is missed and the dock passes `+01:00`, press **Pause** and carry on. The twist event only adds a line to the latest event strip.
 
 ## Not in the video, for live Q&A
 
+- **The audit log**: the **Audit log** tab in the header. After **Confirm hold** it opens filtered to `MSKU1234567`, with the planner line on top.
 - **Rated orders**: in the dock, press **More controls**, then the **Rated orders** switch. Six boxes get a 03:00 gate out deadline and take their slots first. On the gate plan, five other boxes show as Slid in **No slot tonight**, each with the slot it lost.
-- **Fake a reading**: on any box card, open **Demo: fake a reading** at the bottom, type 41,000 into **Carrier weight in lb**, and press **Send weight**. The weight conflict appears, carrier trust drops, and the step changes on the spot.
+- **Fake a reading**: on any box card, open **Demo: fake a reading** at the bottom, type 41,000 into **Carrier weight in lb**, and press **Send weight**. The weight conflict appears, carrier trust drops, and the step changes on the spot. In Rotterdam and Shanghai the field takes kilograms.
 - **Silent reefer**: in the dock, press **More controls**. Under **Reefer fault**, pick a reefer, choose **Trip circuit**, and press **Apply**. Every unit on that circuit goes quiet, and Rung asks the reefer crew to check the breaker instead of sending a technician to each box.
+- **The gate plan in another region**: switch the **Region** menu on the **Gate plan** tab. The plan, the 96 of 129, and the reefer counts stay the same. Fees and the CO2 label change.
 - **The ladder in full**: on the Queue, press **How the ladder works** for every step, what it means at the gate, who acts, and how the votes are counted.
 
 ## The 30 second version
@@ -156,7 +234,8 @@ for the **Terminal feed dark** banner. Then press **Pause**.
 > gentlest safe step, from Release to Hand. Tonight half our lanes are down and the terminal feed is
 > dark, and Rung still keeps 96 of 129 trucks moving, every reefer included. When the paperwork and
 > the scale disagree, it calls the trucker with a voice agent and writes the answer into an audit
-> log. The planner signs every hard call.
+> log. The same engine runs in Rotterdam and Shanghai with only the edges changed, and it launches on
+> an NSF SBIR Phase I grant.
 
 ## Judges Q&A
 
@@ -176,6 +255,43 @@ Press **Voice agent prompt** in the dock, or **See the agent prompt** on any box
 shows the prompt, the six values filled in for each call, the tools the agent can use, and the
 fields read back after the call. It comes from `GET /api/prompts`, which reads
 `scripts/retell_setup.py`, the same script that creates the agent, so the two cannot drift apart.
+
+**How would you fund it?** (Twist 1)
+The primary path is an NSF SBIR Phase I grant, solicitation NSF 26-510: up to $305K over 6 to 18
+months, Project Pitch first, with full proposal deadlines on Nov 4, 2026 and Mar 4, 2027. Phase I
+proves trust calibration, the safe degraded mode, and re-slotting at terminal scale, in shadow mode
+at a Port of Long Beach terminal. The alternatives are DoD SBIR, by asking USTRANSCOM and SDDC to
+sponsor a port readiness topic, and MARAD's Port Infrastructure Development Program for the rollout,
+with the port as lead applicant. Every program was checked on Oct 17, 2026. Partner names are targets.
+Rung has no letters of support yet. The plan is in [funding-pathway.md](funding-pathway.md).
+
+**Why NSF first, and not DoD?**
+NSF funds across nearly all technology areas, so Rung needs no topic match, and it asks for
+commercial impact first, which is the everyday Tuesday customer. We found no port or logistics topic
+in DoD's FY27 Release 1, so DoD needs a sponsor first. Harbor Night is the dual use case that makes
+that conversation possible.
+
+**Does it work outside the US?** (Twist 2)
+Yes. The ladder, `evaluate()`, trust, the five conflicts, the gate optimizer, human approval, and the
+audit log never know which country they run in. A region profile changes only the edges: the data
+adapters, units and currency, the customs authority and who owns a hold, and the time zone label.
+`tests/test_regions.py` checks that every decision and the gate plan are identical in Los Angeles,
+Rotterdam, and Shanghai, and that the engine and rule files never import the region code.
+
+**Are Portbase and the China Single Window connected?**
+No. They are named stubs, and the chip in the header says so. Terminal49 is the only live adapter.
+The exchange rates are fixed demo rates, EUR at 0.86 and CNY at 7.1 per USD, labeled as such.
+[global.md](global.md) covers what a real rollout needs, port by port, including Singapore and Lagos.
+
+**Where is the poster?** (Twist 3)
+`docs/poster/rung-poster.pdf`, one 24 by 36 inch portrait page, built from HTML and CSS by
+`docs/poster/build.py`. Its numbers come from the app on Harbor Night at `+00:40`, the same numbers
+in the demo, and its QR codes link to the code and the demo video.
+
+**How did the twists land in the code?**
+Each twist is a commit tagged `twist:` with its id, and the **Twist log** under **More controls** in
+the dock reads them from git. It shows when each twist was received and merged, the files it added,
+and the full diff.
 
 **Is the CO2 number measured?**
 No, it is modelled. Rung counts how long each booked truck idles at the gate under its plan and if the
@@ -212,8 +328,8 @@ A planner has to defend a hold to customs, a shipping line, and a trucker. A rul
 attached can be defended. A score cannot. New cases are new rule files, without retraining.
 
 **How do you add a new kind of problem?**
-Add one file in `backend/rules` with a test, a step, and a reason. During the hackathon each twist
-works that way, and the **Twist log** under **More controls** shows its git diff.
+Add one file in `backend/rules` with a test, a step, and a reason. A new port is a region profile and
+its adapters, not a change to the engine.
 
 **Can I try to break it?**
 Yes. Every box card has **Demo: fake a reading**. Type a fake carrier weight or place a hold, and the
@@ -232,7 +348,8 @@ browser. The outcome itself can land mid call, as soon as the agent records it.
 **What would it take to run at a real terminal?**
 The carrier, terminal, and customs sources already accept Terminal49's data as is. The weighbridge
 and reefer monitoring are simulated here and would need adapters to the terminal's own systems. Phone
-calls need a Retell number.
+calls need a Retell number. Outside the US, the same adapter work applies to Portbase, the China
+Single Window, or the local port community system.
 
 **Does it need the internet?**
 No. With no keys the whole scenario runs offline, including a scripted simulated call.
