@@ -116,7 +116,7 @@ export default function BoxCard({ number, onAudit, onPrompt }: { number: string;
       {reeferUp && <ReeferCard box={b} />}
 
       <Tabs defaultValue="why" className="mt-1 gap-3">
-        <TabsList variant="line" aria-label="Evidence" className="h-auto w-full flex-wrap justify-start gap-0 rounded-none border-b-2 border-slate-200 p-0">
+        <TabsList variant="line" aria-label="Evidence" className="w-full flex-wrap justify-start gap-0 rounded-none border-b-2 border-slate-200 p-0 group-data-horizontal/tabs:h-auto">
           <TabsTrigger value="why" className={TAB}>
             <Vote className="size-5" aria-hidden />
             Why Rung says {STEP_META[d.engine_step].word}
