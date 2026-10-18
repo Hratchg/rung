@@ -5,13 +5,14 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { useAppState, useRegionSwitch, type State } from './api'
 import { AuditPanel, TwistPanel } from './Audit'
 import BoxCard from './BoxCard'
-import { NIGHT_COPY, emissionsNote, eventLine } from './copy'
+import { NIGHT_COPY, eventLine } from './copy'
 import DemoDock from './Demo'
 import GateScreen from './Gate'
+import { ModePill } from './NightBrief'
 import { PromptPanel } from './Prompts'
 import Queue from './Queue'
-import { laneList, sayKg, sayNum, sayTime } from './format'
-import { sayMoney, setRegion } from './region'
+import { sayTime } from './format'
+import { setRegion } from './region'
 import { BadgeChip, Hint } from './ui'
 
 type Route = { name: 'queue' } | { name: 'gate' } | { name: 'box'; number: string }
@@ -43,18 +44,6 @@ function clockParts(iso: string) {
   const [date, rest] = iso.split('T')
   const [, month, day] = date.split('-').map(Number)
   return { date: `${MONTHS[month - 1]} ${day}`, time: rest.slice(0, 5) }
-}
-
-function Stat({ label, value, tone = '', hint, note }: { label: string; value: string; tone?: string; hint: string; note?: string }) {
-  return (
-    <Hint text={hint}>
-      <span tabIndex={0} className="flex items-baseline gap-1.5 whitespace-nowrap">
-        <span className="opacity-75">{label}</span>
-        <span className={`text-lg font-bold tabular-nums ${tone}`}>{value}</span>
-        {note && <span className="opacity-60">{note}</span>}
-      </span>
-    </Hint>
-  )
 }
 
 const POLLER_TEXT: Record<string, string> = {
@@ -93,7 +82,7 @@ function RegionSwitch({ state }: { state: State }) {
     <Hint text={`${r.port}, ${r.country}. Units in ${r.weight_unit === 'kg' ? 'kilograms' : 'pounds'} and ${r.currency}. Customs is ${r.customs}. Rung decides the same way in every region.`}>
       <span>
         <Select value={r.id} onValueChange={(id) => change.mutate(id)} disabled={change.isPending}>
-          <SelectTrigger aria-label="Region" className="h-9 border-current/30 text-lg font-semibold data-[size=default]:h-9 [&_svg]:text-current">
+          <SelectTrigger aria-label="Region" className="h-8 border-current/30 font-semibold data-[size=default]:h-8 [&_svg]:text-current">
             <Globe className="size-4" aria-hidden />
             <SelectValue />
           </SelectTrigger>
@@ -138,12 +127,13 @@ function StatusStrip({ state }: { state: State }) {
           </span>
         </p>
       ))}
-      <div className="flex items-center gap-x-4 border-t border-current/10 px-4 py-1">
-        <p className="flex min-w-0 flex-1 items-center gap-2">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-current/10 px-4 py-1">
+        <p className="flex min-w-0 flex-1 basis-64 items-center gap-2">
           <Radio className="size-4 shrink-0" aria-hidden />
           <span className="shrink-0 opacity-75">Latest event</span>
           <span className="truncate font-semibold">{latest ? eventLine(latest) : 'Nothing has happened yet tonight'}</span>
         </p>
+        <RegionSwitch state={state} />
         <DataChip state={state} />
       </div>
     </div>
@@ -154,24 +144,21 @@ function Header({ state, route, panel, onPanel }: { state: State; route: Route; 
   const { time, date } = clockParts(state.clock)
   const harbor = state.mode === 'harbor_night'
   const night = NIGHT_COPY[state.mode] ?? { name: state.mode, tagline: '' }
-  const closed = Array.from({ length: state.lanes }, (_, i) => i + 1).filter((l) => !state.lanes_open.includes(l))
-  const c = state.counters
   const auditBox = route.name === 'box' ? route.number : ''
   return (
-    <header className={`sticky top-0 z-20 shadow-md ${harbor ? 'bg-indigo-950 text-white' : 'bg-white text-slate-900'}`}>
+    <header className={`sticky top-0 z-20 shadow-md ${harbor ? 'border-b-4 border-red-600 bg-indigo-950 text-white' : 'border-b border-slate-200 bg-white text-slate-900'}`}>
       <div className="flex min-h-16 flex-wrap items-center gap-x-5 gap-y-1 px-4 py-1.5">
         <a href="#/" className="flex items-baseline gap-2">
           <span className="text-2xl font-black tracking-tight">Rung</span>
           <span className="text-lg opacity-75">Gate triage at {state.terminal}</span>
         </a>
-        <RegionSwitch state={state} />
         <span className="flex items-center gap-2">
+          <ModePill mode={state.mode} />
           <Hint text={night.tagline}>
-            <span tabIndex={0} className={`rounded-md px-3 py-0.5 text-lg font-bold ${harbor ? 'bg-amber-300 text-indigo-950' : 'bg-sky-100 text-sky-900'}`}>
+            <span tabIndex={0} className="text-lg font-semibold opacity-85">
               {night.name}
             </span>
           </Hint>
-          <span className="hidden opacity-75 2xl:inline">{night.tagline}</span>
         </span>
         <span className="flex items-baseline gap-2">
           <span className="text-2xl font-bold tabular-nums">{time}</span>
@@ -180,10 +167,6 @@ function Header({ state, route, panel, onPanel }: { state: State; route: Route; 
               {date} {state.region.tz_label}
             </span>
           </Hint>
-        </span>
-        <span className="text-lg">
-          Lanes open <strong>{state.lanes_open.length}</strong> of {state.lanes}
-          {closed.length > 0 && <span className={`ml-2 font-semibold ${harbor ? 'text-amber-300' : 'text-amber-700'}`}>Closed {laneList(closed)}</span>}
         </span>
         <nav className="ml-auto flex items-center gap-1" aria-label="Screens">
           <Tab href="#/" active={route.name !== 'gate'}>
@@ -196,25 +179,6 @@ function Header({ state, route, panel, onPanel }: { state: State; route: Route; 
             Audit log
           </Tab>
         </nav>
-      </div>
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-current/10 px-4 py-1">
-        <span className="font-semibold opacity-75">Tonight so far</span>
-        <Stat label="Released" value={String(c.released)} hint="Trucks that have left the gate since the shift started." />
-        <Stat label="Reefers powered" value={String(c.reefers_powered)} hint="Refrigerated boxes with power on, or already gone on a truck." />
-        <Stat
-          label="Reefers lost"
-          value={String(c.reefers_lost)}
-          tone={c.reefers_lost > 0 ? (harbor ? 'text-red-300' : 'text-red-700') : ''}
-          hint="Reefers whose cargo has warmed past its loss limit."
-        />
-        <Stat label="Fees avoided" value={sayMoney(c.demurrage_avoided_usd)} hint="Demurrage, the daily storage fee a box owes once its free days run out, saved by releasing boxes in time." />
-        <Stat label="Bookings kept" value={`${c.throughput_pct}%`} hint="Share of the bookings for tonight that still have a gate slot." />
-        <Stat
-          label="Truck idle"
-          note="modelled"
-          value={`${sayNum(c.idle_hours)} h, ${sayKg(c.idle_co2_kg)} kg CO2`}
-          hint={`Hours booked trucks have idled at the gate so far tonight, and the CO2 that idling burned. Closing the terminal would be ${sayNum(state.counters_blunt.idle_hours)} h and ${sayKg(state.counters_blunt.idle_co2_kg)} kg by now. ${emissionsNote(state.emissions)}`}
-        />
       </div>
       <StatusStrip state={state} />
     </header>
@@ -239,7 +203,7 @@ export default function App() {
         {state.isError && <p className="bg-red-100 px-4 py-2 text-red-900">Lost contact with the Rung server. Showing the last update.</p>}
         {route.name === 'box' && <BoxCard key={route.number} number={route.number} onAudit={(box) => setPanel({ kind: 'audit', box })} onPrompt={() => setPanel({ kind: 'prompt' })} />}
         {route.name === 'gate' && <GateScreen />}
-        {route.name === 'queue' && <Queue carriers={state.data.carriers} />}
+        {route.name === 'queue' && <Queue state={state.data} />}
         <AuditPanel open={panel?.kind === 'audit'} key={panel?.kind === 'audit' ? panel.box : 'audit'} initialBox={panel?.kind === 'audit' ? panel.box : ''} onClose={closePanel} />
         <TwistPanel open={panel?.kind === 'twist'} onClose={closePanel} />
         <PromptPanel open={panel?.kind === 'prompt'} onClose={closePanel} />
