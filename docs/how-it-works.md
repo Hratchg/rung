@@ -428,8 +428,10 @@ assumption.
 During the hackathon, a message starting with TWIST adds one new rule, event type, or source. Each
 twist is recorded in `twists.json` and committed as `twist: <tag>`. The **Twist log** button under **More controls** lists each tag,
 when it arrived, what it added, when it merged, and the git diff of its commits, capped at 400 lines.
-No twist has been merged yet. Before `+01:00` the panel says so, and from `+01:00` it lists the
-scripted `twist-1` placeholder.
+Three twists are merged: `twist-1-funding`, the [federal funding pathway](funding-pathway.md);
+`twist-2-global`, the region switch and [Rung, global](global.md); and `twist-3-poster`, the
+[Demo Day poster](poster/). The panel lists all three, and from `+01:00` it also lists the scripted
+`twist-1` placeholder.
 
 ## Tests
 
