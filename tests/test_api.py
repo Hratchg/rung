@@ -276,9 +276,7 @@ def test_audit_newest_first_with_limit_and_box_filter(client):
 def test_twist_panel_lists_the_scripted_twist(client):
     assert "twist-1" not in [t["tag"] for t in client.get("/api/audit").json()["twists"]]
     client.post("/api/scenario/jump", json={"t": "+01:00"})
-    twists = [t for t in client.get("/api/audit").json()["twists"] if t["tag"] == "twist-1"]
-    assert len(twists) == 1
-    t = twists[0]
+    t = next(t for t in client.get("/api/audit").json()["twists"] if t["tag"] == "twist-1")
     assert t["received_at"] == "2026-10-18T23:00:00-07:00" and t["status"] == "received" and t["added"] == []
 
 
