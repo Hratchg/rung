@@ -78,7 +78,7 @@ export function AuditPanel({ open, initialBox, onClose }: { open: boolean; initi
         </p>
       )}
       {lines && lines.length > 0 && (
-        <ol className="mt-3 flex flex-col divide-y divide-slate-200">
+        <ol className="mt-3 flex flex-col divide-y divide-slate-200" data-demo="audit-lines">
           {lines.map((line) => (
             <AuditItem key={line.seq} line={line} />
           ))}

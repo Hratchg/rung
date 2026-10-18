@@ -2,7 +2,7 @@ import { Bot, PhoneCall, Wrench } from 'lucide-react'
 import { usePrompts } from './api'
 import { Drawer } from './Audit'
 import { PROMPT_COPY } from './copy'
-import { promptBlocks, promptParts } from './promptText'
+import { promptBlocks, promptParts, type PromptBlock } from './promptText'
 
 function Rich({ text }: { text: string }) {
   return (
@@ -24,47 +24,57 @@ function Rich({ text }: { text: string }) {
   )
 }
 
-function PromptBody({ prompt }: { prompt: string }) {
+const slug = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+
+function Block({ block: b }: { block: PromptBlock }) {
+  if (b.kind === 'step') {
+    return (
+      <p className="flex gap-2">
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-slate-800 font-bold text-white">{b.n}</span>
+        <span>
+          <Rich text={b.text} />
+        </span>
+      </p>
+    )
+  }
+  if (b.kind === 'bullet') {
+    return (
+      <p className="ml-9 border-l-4 border-slate-300 pl-3">
+        <Rich text={b.text} />
+      </p>
+    )
+  }
   return (
-    <div className="flex flex-col gap-2 leading-relaxed">
-      {promptBlocks(prompt).map((b, i) => {
-        if (b.kind === 'heading') {
-          return (
-            <h3 key={i} className="mt-3 border-b border-slate-200 pb-1 text-lg font-bold text-slate-900 first:mt-0">
-              {b.text}
-            </h3>
-          )
-        }
-        if (b.kind === 'step') {
-          return (
-            <p key={i} className="flex gap-2">
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-slate-800 font-bold text-white">{b.n}</span>
-              <span>
-                <Rich text={b.text} />
-              </span>
-            </p>
-          )
-        }
-        if (b.kind === 'bullet') {
-          return (
-            <p key={i} className="ml-9 border-l-4 border-slate-300 pl-3">
-              <Rich text={b.text} />
-            </p>
-          )
-        }
-        return (
-          <p key={i}>
-            <Rich text={b.text} />
-          </p>
-        )
-      })}
+    <p>
+      <Rich text={b.text} />
+    </p>
+  )
+}
+
+function PromptBody({ prompt }: { prompt: string }) {
+  const sections: { title: string; blocks: PromptBlock[] }[] = []
+  for (const b of promptBlocks(prompt)) {
+    if (b.kind === 'heading') sections.push({ title: b.text, blocks: [] })
+    else if (sections.length === 0) sections.push({ title: '', blocks: [b] })
+    else sections[sections.length - 1].blocks.push(b)
+  }
+  return (
+    <div className="flex flex-col gap-5 leading-relaxed">
+      {sections.map((s, i) => (
+        <section key={i} data-demo={`prompt-${slug(s.title)}`} className="flex flex-col gap-2">
+          {s.title && <h3 className="border-b border-slate-200 pb-1 text-lg font-bold text-slate-900">{s.title}</h3>}
+          {s.blocks.map((b, j) => (
+            <Block key={j} block={b} />
+          ))}
+        </section>
+      ))}
     </div>
   )
 }
 
 function Side({ title, icon: Icon, items }: { title: string; icon: typeof Bot; items: { name: string; text: string }[] }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+    <section className="rounded-xl border border-slate-200 bg-slate-50 p-3" data-demo={`prompt-${slug(title)}`}>
       <h3 className="flex items-center gap-2 font-bold text-slate-900">
         <Icon className="size-5" aria-hidden />
         {title}

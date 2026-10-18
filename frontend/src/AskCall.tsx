@@ -83,7 +83,7 @@ export default function AskCall({ box, embedded = false, onPrompt }: { box: BoxD
 
   const shell = embedded ? '' : 'rounded-xl border-2 border-sky-300 bg-white p-4 shadow-sm'
   return (
-    <section className={shell} aria-label="Call the trucker">
+    <section className={shell} aria-label="Call the trucker" data-demo="ask-call">
       <div className="flex flex-wrap items-center gap-3">
         {!embedded && (
           <h3 className="flex items-center gap-2 text-lg font-bold">
@@ -99,6 +99,7 @@ export default function AskCall({ box, embedded = false, onPrompt }: { box: BoxD
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <Button
           size="lg"
+          data-demo="call-button"
           className="bg-sky-700 text-white hover:bg-sky-800"
           disabled={!box.ask.available || active || start.isPending || liveOn}
           onClick={ask}
@@ -161,7 +162,7 @@ export default function AskCall({ box, embedded = false, onPrompt }: { box: BoxD
               ))}
             </ol>
           </div>
-          <div aria-label="Call outcome">
+          <div aria-label="Call outcome" data-demo="call-outcome">
             {call.outcome ? (
               <div className={`rounded-lg border-l-8 p-3 ${OUTCOME_TONE[call.outcome]}`}>
                 <div className="font-semibold">What the trucker said</div>

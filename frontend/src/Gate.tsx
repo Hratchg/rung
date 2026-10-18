@@ -92,6 +92,7 @@ function Hero({ gate }: { gate: Gate }) {
     <section
       className={`rounded-xl bg-white p-4 shadow-sm ${crisis ? 'border-2 border-red-600' : 'border border-slate-200'}`}
       aria-label="Rung against closing the terminal"
+      data-demo="gate-hero"
     >
       {crisis && (
         <p className="mb-1 flex items-center gap-2 text-lg font-bold text-red-700">
@@ -125,7 +126,7 @@ function CalmHero({ gate, emissions }: { gate: Gate; emissions: Emissions | unde
     ['Truck idle at the gate tonight', `${sayKg(rung.idle_co2_kg_plan)} kg CO2`, `${sayNum(rung.idle_hours_plan, 0)} h, modelled`],
   ]
   return (
-    <section className="rounded-xl border border-l-8 border-slate-200 border-l-sky-500 bg-white p-4 shadow-sm" aria-label="Gate plan tonight">
+    <section className="rounded-xl border border-l-8 border-slate-200 border-l-sky-500 bg-white p-4 shadow-sm" aria-label="Gate plan tonight" data-demo="gate-hero">
       <p className="mb-1 flex items-center gap-2 text-lg font-bold text-sky-900">
         <ShieldCheck className="size-5" aria-hidden />
         {MODE_COPY.everyday.label}

@@ -7,6 +7,8 @@ import { AuditPanel, TwistPanel } from './Audit'
 import BoxCard from './BoxCard'
 import { NIGHT_COPY, eventLine } from './copy'
 import DemoDock from './Demo'
+import DemoPlayer from './DemoPlayer'
+import { demoRequested, prepareDemo } from './demoStart'
 import GateScreen from './Gate'
 import { ModePill } from './NightBrief'
 import { PromptPanel } from './Prompts'
@@ -117,7 +119,7 @@ function StatusStrip({ state }: { state: State }) {
   return (
     <div className="flex flex-col">
       {state.dark_feed.map((line) => (
-        <p key={`${line.cause}-${line.source}`} role="status" className="flex flex-wrap items-center gap-x-3 bg-red-700 px-4 py-1.5 text-white">
+        <p key={`${line.cause}-${line.source}`} role="status" data-demo="dark-banner" className="flex flex-wrap items-center gap-x-3 bg-red-700 px-4 py-1.5 text-white">
           <WifiOff className="size-5" aria-hidden />
           <strong className="text-lg">{line.text}</strong>
           <span>
@@ -127,8 +129,8 @@ function StatusStrip({ state }: { state: State }) {
           </span>
         </p>
       ))}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-current/10 px-4 py-1">
-        <p className="flex min-w-0 flex-1 basis-64 items-center gap-2">
+      <div data-demo="status-line" className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-current/10 px-4 py-1">
+        <p data-demo="latest-event" className="flex min-w-0 flex-1 basis-64 items-center gap-2">
           <Radio className="size-4 shrink-0" aria-hidden />
           <span className="shrink-0 opacity-75">Latest event</span>
           <span className="truncate font-semibold">{latest ? eventLine(latest) : 'Nothing has happened yet tonight'}</span>
@@ -146,7 +148,7 @@ function Header({ state, route, panel, onPanel }: { state: State; route: Route; 
   const night = NIGHT_COPY[state.mode] ?? { name: state.mode, tagline: '' }
   const auditBox = route.name === 'box' ? route.number : ''
   return (
-    <header className={`sticky top-0 z-20 shadow-md ${harbor ? 'border-b-4 border-red-600 bg-indigo-950 text-white' : 'border-b border-slate-200 bg-white text-slate-900'}`}>
+    <header data-demo="app-header" className={`sticky top-0 z-20 shadow-md ${harbor ? 'border-b-4 border-red-600 bg-indigo-950 text-white' : 'border-b border-slate-200 bg-white text-slate-900'}`}>
       <div className="flex min-h-16 flex-wrap items-center gap-x-5 gap-y-1 px-4 py-1.5">
         <a href="#/" className="flex items-baseline gap-2">
           <span className="text-2xl font-black tracking-tight">Rung</span>
@@ -185,11 +187,26 @@ function Header({ state, route, panel, onPanel }: { state: State; route: Route; 
   )
 }
 
+function useDemo(): { run: number; on: boolean; start: () => void; stop: () => void } {
+  const [demo, setDemo] = useState(() => {
+    const on = demoRequested()
+    if (on) prepareDemo()
+    return { run: 0, on }
+  })
+  const start = useCallback(() => {
+    prepareDemo()
+    setDemo((d) => ({ run: d.run + 1, on: true }))
+  }, [])
+  const stop = useCallback(() => setDemo((d) => ({ ...d, on: false })), [])
+  return { ...demo, start, stop }
+}
+
 export default function App() {
   const state = useAppState()
   const route = useRoute()
   const [panel, setPanel] = useState<Panel>(null)
   const closePanel = useCallback(() => setPanel(null), [])
+  const demo = useDemo()
   if (!state.data) {
     return (
       <p className="p-6 text-lg">{state.isError ? 'Cannot reach the Rung server. Retrying every 2 seconds.' : 'Loading Pier 7'}</p>
@@ -203,11 +220,15 @@ export default function App() {
         {state.isError && <p className="bg-red-100 px-4 py-2 text-red-900">Lost contact with the Rung server. Showing the last update.</p>}
         {route.name === 'box' && <BoxCard key={route.number} number={route.number} onAudit={(box) => setPanel({ kind: 'audit', box })} onPrompt={() => setPanel({ kind: 'prompt' })} />}
         {route.name === 'gate' && <GateScreen />}
-        {route.name === 'queue' && <Queue state={state.data} />}
+        {route.name === 'queue' && <Queue key={demo.run} state={state.data} />}
         <AuditPanel open={panel?.kind === 'audit'} key={panel?.kind === 'audit' ? panel.box : 'audit'} initialBox={panel?.kind === 'audit' ? panel.box : ''} onClose={closePanel} />
         <TwistPanel open={panel?.kind === 'twist'} onClose={closePanel} />
         <PromptPanel open={panel?.kind === 'prompt'} onClose={closePanel} />
-        <DemoDock state={state.data} onTwist={() => setPanel({ kind: 'twist' })} onPrompt={() => setPanel({ kind: 'prompt' })} />
+        {demo.on ? (
+          <DemoPlayer key={demo.run} setPanel={setPanel} onStop={demo.stop} />
+        ) : (
+          <DemoDock state={state.data} onTwist={() => setPanel({ kind: 'twist' })} onPrompt={() => setPanel({ kind: 'prompt' })} onDemo={demo.start} />
+        )}
       </div>
     </TooltipProvider>
   )

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check, ChevronUp, FileText, FlaskConical, RotateCcw, Siren } from 'lucide-react'
+import { Check, ChevronUp, FileText, FlaskConical, Play, RotateCcw, Siren } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useRatedToggle, useScenarioControls, type ScenarioEvent, type State } from './api'
 import { DEMO_NOTE, describeEvent } from './copy'
@@ -141,7 +141,7 @@ function NightSwitch({ state, busy, onEveryday, onCrisis }: { state: State; busy
   )
 }
 
-export default function DemoDock({ state, onTwist, onPrompt }: { state: State; onTwist: () => void; onPrompt: () => void }) {
+export default function DemoDock({ state, onTwist, onPrompt, onDemo }: { state: State; onTwist: () => void; onPrompt: () => void; onDemo: () => void }) {
   const [open, setOpen] = useState(false)
   const { reset, speed, fire, jump } = useScenarioControls()
   const scripted = (type: string) => state.scripted_events.find((e) => e.type === type)
@@ -243,6 +243,16 @@ export default function DemoDock({ state, onTwist, onPrompt }: { state: State; o
         {error && <span className="rounded bg-red-100 px-2 text-red-900">{error.message}</span>}
         {note && <span className="rounded bg-amber-100 px-2 text-amber-950">{note}</span>}
         <div className="ml-auto flex items-center gap-2">
+          <Button
+            variant="demo"
+            size="sm"
+            data-demo="play-demo"
+            title="Play the guided tour of the whole story, about 2 minutes 46 seconds. It starts the night over. Press Esc to stop."
+            onClick={onDemo}
+          >
+            <Play aria-hidden />
+            Play demo
+          </Button>
           <Button variant="demo" size="sm" className="hidden sm:inline-flex" onClick={onPrompt}>
             <FileText aria-hidden />
             Voice agent prompt

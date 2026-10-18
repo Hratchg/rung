@@ -77,7 +77,7 @@ export default function Queue({ state }: { state: State }) {
 
       <section ref={queueRef} aria-label="Gate queue" className="scroll-mt-40 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
         <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
-          <div>
+          <div data-demo="queue-headline">
             <h2 className="text-2xl font-bold tracking-tight">
               {!all
                 ? 'Gate queue'
@@ -223,7 +223,7 @@ function ViewSwitch({ view, onChange }: { view: View; onChange: (v: View) => voi
 
 function LadderStrip({ counts, filter, onPick }: { counts: Record<Step, number>; filter: Filter; onPick: (s: Step) => void }) {
   return (
-    <div aria-label="The ladder" role="group" className="mt-3 grid grid-cols-[repeat(5,minmax(0,1fr))_auto_minmax(0,1fr)] items-stretch gap-2">
+    <div aria-label="The ladder" role="group" data-demo="ladder" className="mt-3 grid grid-cols-[repeat(5,minmax(0,1fr))_auto_minmax(0,1fr)] items-stretch gap-2">
       {LADDER.flatMap((s) => {
         const Icon = STEP_ICON[s]
         const on = filter === s
@@ -233,6 +233,7 @@ function LadderStrip({ counts, filter, onPick }: { counts: Record<Step, number>;
           <button
             key={s}
             type="button"
+            data-demo={`ladder-${s}`}
             aria-pressed={on}
             title={`${STEP_META[s].meaning} Click to show only ${STEP_META[s].word} boxes.`}
             onClick={() => onPick(s)}
@@ -344,7 +345,7 @@ function SimpleRow({ row, onOverride }: { row: QueueRow; onOverride: () => void 
   const level = urgencyLevel(row.urgency)
   return (
     <Fragment>
-      <tr className={`border-t border-slate-100 align-top ${open ? 'bg-slate-50' : 'hover:bg-slate-50/70'}`}>
+      <tr data-demo={`row-${row.number}`} className={`border-t border-slate-100 align-top ${open ? 'bg-slate-50' : 'hover:bg-slate-50/70'}`}>
         <td className="px-3 py-2.5">
           <BoxNumber number={row.number} />
           <div className="text-slate-700">{equipment(row)}</div>
@@ -409,7 +410,7 @@ function Detail({ label, children }: { label: ReactNode; children: ReactNode }) 
 function Row({ row, onOverride }: { row: QueueRow; onOverride: () => void }) {
   const [open, setOpen] = useState(false)
   return (
-    <tr className="border-t border-slate-100 align-top hover:bg-slate-50/70">
+    <tr data-demo={`row-${row.number}`} className="border-t border-slate-100 align-top hover:bg-slate-50/70">
       <td className="px-3 py-2.5">
         <BoxNumber number={row.number} />
         <div className="text-slate-700">{equipment(row)}</div>

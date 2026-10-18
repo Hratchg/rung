@@ -24,6 +24,7 @@ export function ModePill({ mode }: { mode: string }) {
     <Hint text={MODE_COPY[m].hint}>
       <span
         tabIndex={0}
+        data-demo="mode-pill"
         className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-0.5 text-lg font-bold whitespace-nowrap ${crisis ? 'bg-red-600 text-white' : 'bg-sky-100 text-sky-900'}`}
       >
         <Icon className="size-5" aria-hidden />
@@ -139,6 +140,7 @@ function EverydayBar({ state, list, onFilter }: { state: State; list: Incident[]
   return (
     <section
       aria-label="Everyday mode"
+      data-demo="everyday-bar"
       className="flex flex-wrap items-start gap-x-6 gap-y-2 rounded-xl border border-l-8 border-slate-200 border-l-sky-500 bg-white px-4 py-2.5 shadow-sm"
     >
       <div className="min-w-0 flex-1 basis-[34rem]">
@@ -208,7 +210,7 @@ function CrisisBoard({ state, list, gate, onFilter }: { state: State; list: Inci
   const night = NIGHT_COPY[state.mode] ?? { name: state.mode, tagline: '' }
   const [open, toggle] = useOpen()
   return (
-    <section aria-label="Crisis mode" className="overflow-hidden rounded-xl border-2 border-red-600 bg-white shadow-sm">
+    <section aria-label="Crisis mode" data-demo="crisis-board" className="overflow-hidden rounded-xl border-2 border-red-600 bg-white shadow-sm">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 bg-red-600 px-4 py-2 text-white">
         <span className="flex items-center gap-2 text-xl font-bold">
           <Siren className="size-6" aria-hidden />
@@ -244,7 +246,7 @@ function CrisisBoard({ state, list, gate, onFilter }: { state: State; list: Inci
             {list.map((i) => {
               const Icon = INCIDENT_ICON[i.kind]
               return (
-                <li key={i.id} className="flex gap-2.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                <li key={i.id} data-demo={`incident-${i.id}`} className="flex gap-2.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
                   <Icon className="mt-0.5 size-5 shrink-0 text-red-700" aria-hidden />
                   <div className="min-w-0 leading-snug">
                     <p className="font-bold text-red-950">{i.title}</p>

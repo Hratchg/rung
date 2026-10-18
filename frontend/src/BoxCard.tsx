@@ -61,14 +61,14 @@ export default function BoxCard({ number, onAudit, onPrompt }: { number: string;
     <main className="mx-auto flex max-w-[1400px] flex-col gap-3 px-4 pt-3 pb-6">
       <Identity box={b} />
       {causes.length > 0 && (
-        <p className="flex flex-wrap items-center gap-x-2 rounded-lg border-2 border-red-600 bg-red-50 px-3 py-1.5 text-lg text-red-950" aria-label="Crisis">
+        <p className="flex flex-wrap items-center gap-x-2 rounded-lg border-2 border-red-600 bg-red-50 px-3 py-1.5 text-lg text-red-950" aria-label="Crisis" data-demo="crisis-line">
           <Siren className="size-5 text-red-700" aria-hidden />
           <strong>{MODE_COPY.crisis.label}.</strong>
           <span>This box is affected tonight because {joinAnd(causes)}.</span>
         </p>
       )}
 
-      <section className={`grid gap-6 rounded-xl border border-l-8 border-slate-200 bg-white p-5 shadow-sm lg:grid-cols-[1fr_280px] ${STEP_META[d.step].rail}`} aria-label="Decision">
+      <section className={`grid gap-6 rounded-xl border border-l-8 border-slate-200 bg-white p-5 shadow-sm lg:grid-cols-[1fr_280px] ${STEP_META[d.step].rail}`} aria-label="Decision" data-demo="decision">
         <div className="min-w-0">
           <p className="font-semibold text-slate-600">Rung recommends</p>
           <div className="mt-1 flex flex-wrap items-center gap-3">
@@ -122,7 +122,7 @@ export default function BoxCard({ number, onAudit, onPrompt }: { number: string;
             Why Rung says {STEP_META[d.engine_step].word}
             {b.conflicts.length > 0 && <span className="rounded bg-red-700 px-1.5 text-base text-white">{b.conflicts.length} disagree</span>}
           </TabsTrigger>
-          <TabsTrigger value="sources" className={TAB}>
+          <TabsTrigger value="sources" className={TAB} data-demo="tab-sources">
             <Database className="size-5" aria-hidden />
             Sources and trust
           </TabsTrigger>
@@ -145,7 +145,7 @@ export default function BoxCard({ number, onAudit, onPrompt }: { number: string;
           </div>
         </TabsContent>
         <TabsContent value="sources" className="text-base">
-          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" aria-label="Sources">
+          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" aria-label="Sources" data-demo="sources">
             <p className="text-slate-700">
               Rung reads five sources for every box. Trust starts from how reliable a source is, fades as its reading ages, and drops for every conflict it is in. Hover a trust bar for the arithmetic.
             </p>
@@ -292,7 +292,7 @@ function WhyCard({ box }: { box: BoxDetail }) {
 function Conflicts({ conflicts }: { conflicts: ConflictInfo[] }) {
   if (conflicts.length === 0) {
     return (
-      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" aria-label="Conflicts">
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" aria-label="Conflicts" data-demo="conflicts">
         <h3 className="flex items-center gap-2 text-lg font-bold">
           <CircleCheck className="size-5 text-emerald-700" aria-hidden />
           Where the sources disagree
@@ -302,7 +302,7 @@ function Conflicts({ conflicts }: { conflicts: ConflictInfo[] }) {
     )
   }
   return (
-    <section className="rounded-xl border-2 border-red-300 bg-red-50 p-4" aria-label="Conflicts">
+    <section className="rounded-xl border-2 border-red-300 bg-red-50 p-4" aria-label="Conflicts" data-demo="conflicts">
       <h3 className="flex items-center gap-2 text-lg font-bold text-red-900">
         <TriangleAlert className="size-5" aria-hidden />
         Where the sources disagree
@@ -402,7 +402,7 @@ function ReeferCard({ box }: { box: BoxDetail }) {
   const cargo = box.sources.reefer?.fields.cargo
   const showClock = box.mode === 'harbor_night' && box.warmup
   return (
-    <section className="flex flex-wrap items-start gap-x-8 gap-y-3 rounded-xl border-2 border-amber-400 bg-amber-50 p-4" aria-label="Reefer">
+    <section className="flex flex-wrap items-start gap-x-8 gap-y-3 rounded-xl border-2 border-amber-400 bg-amber-50 p-4" aria-label="Reefer" data-demo="reefer-card">
       <div className="flex items-center gap-2">
         <Snowflake className="size-6 text-sky-700" aria-hidden />
         <div>
