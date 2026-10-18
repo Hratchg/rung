@@ -129,8 +129,9 @@ free day boxes 28 of 28, and truck idle CO2.
 > Rung keeps 96 of 129 trucks moving, every reefer, and every last free day box. Closing the terminal
 > keeps none. And by our model it saves about 750 kilograms of CO2 from trucks idling at the gate.
 
-At the pause the headline reads about 92 idle hours and 750 kg. The plan changes as the night moves,
-so these numbers drift by a few kg.
+At the pause the headline reads **saves 92 idle hours and 749 kg of CO2**. The fourth card shows the
+two totals behind it, Rung about 302 kg against Closed terminal about 1,051 kg, and the 750 kg in the
+line is the difference. The plan changes as the night moves, so these numbers drift by a few kg.
 
 ### 1:54 The box that matters (9 s)
 
